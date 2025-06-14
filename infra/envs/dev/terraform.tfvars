@@ -1,1 +1,1 @@
-bucket_name = "dev-sa-east-1-fefedd"
+bucket_name = "dev-sa-east-1-fefedd" # colocar um nome único para o bucket
