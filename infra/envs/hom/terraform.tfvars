@@ -1,1 +1,1 @@
-bucket_name = "hom-sa-east-1-buildrun-video-pipeline"
+bucket_name = "hom-sa-east-1-fefedd" # colocar um nome único para o bucket
