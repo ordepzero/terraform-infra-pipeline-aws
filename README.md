@@ -43,8 +43,9 @@ bucket_name = "<env>-sa-east-1-buildrun-video-pipeline"
 - A conexão do github e aws será entre o OpenIdentity
 - Acessar o IAM > Identity provider > Add provider
 - Preencha:
--- Provider URL: `https://token.actions.githubusercontent.com`
--- Audience: `sts.amazonaws.com`
+
+  - Provider URL: `https://token.actions.githubusercontent.com`
+  - Audience: `sts.amazonaws.com`
 - Clique no provider recém criado:
 ![alt text](image.png)
 
@@ -90,3 +91,4 @@ AmazonDynamoDBFullAccess
 ![alt text](image-9.png)
 - Clicar em `Create table`
 
+Feito isso, criar o arquivo .github/workflows/terraform.yaml, .github/workflows/develop.yaml, .github/workflows/prod.yaml
