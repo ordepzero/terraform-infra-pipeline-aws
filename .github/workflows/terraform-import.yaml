@@ -1,7 +1,6 @@
 # .github/workflows/terraform-import.yaml
 name: Terraform Import Resource
 
-# Este workflow será disparado manualmente da aba "Actions" no GitHub
 on:
   workflow_dispatch:
     inputs:
@@ -14,15 +13,21 @@ on:
         required: true
         type: string
       terraform_state_key:
-        description: 'Caminho completo da chave do state file S3 (ex: env:/dev/terraform-infra-pipeline-aws)'
+        description: 'Caminho completo da chave do state file S3 (ex: env:/dev/terraform-infra-pipeline-aws/terraform.tfstate)'
         required: true
         type: string
-        default: 'env:/dev/terraform-infra-pipeline-aws'
+        default: 'env:/dev/terraform-infra-pipeline-aws/terraform.tfstate'
       aws_region:
         description: 'Região AWS para o Terraform'
         required: true
         type: string
         default: 'sa-east-1'
+      # NOVO INPUT: Para especificar o subdiretório do Terraform
+      terraform_working_directory:
+        description: 'Subdiretório onde os arquivos .tf estão (ex: "terraform" ou "src/infra")'
+        required: false # Pode ser opcional se os arquivos estiverem na raiz do repo
+        type: string
+        default: 'infra' # Deixe vazio se estiver na raiz, ou coloque o nome da pasta
 
 permissions:
   id-token: write # Necessário para OIDC
@@ -40,31 +45,30 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          # Use a role que sua esteira principal já utiliza
           role-to-assume: arn:aws:iam::533267324332:role/github-actions-ordepzero-role 
           aws-region: ${{ github.event.inputs.aws_region }}
-          role-session-name: GitHub_to_AWS_via_FederatedOIDC
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          # Certifique-se de que esta versão corresponde à do seu projeto Terraform
           terraform_version: 1.8.3 
 
       - name: Terraform Init
+        # Usamos o 'working-directory' para que o Terraform encontre os arquivos .tf
+        working-directory: ${{ github.event.inputs.terraform_working_directory }}
         run: |
           terraform init \
             -backend-config="bucket=ordepzero-sa-east-1-terraform-statefile" \
             -backend-config="key=${{ github.event.inputs.terraform_state_key }}" \
             -backend-config="region=${{ github.event.inputs.aws_region }}" \
             -backend-config="dynamodb_table=ordepzero-sa-east-1-terraform-lock" \
-            -upgrade # Garante que o provedor mais recente seja baixado se necessário
-
+            -upgrade 
 
       - name: Perform Terraform Import
+        # Usamos o 'working-directory' aqui também
+        working-directory: ${{ github.event.inputs.terraform_working_directory }}
         run: terraform import ${{ github.event.inputs.resource_address }} ${{ github.event.inputs.resource_id }}
         id: import_step
-        # continue-on-error: true # Opcional: Se quiser que o workflow continue mesmo se o import falhar (não recomendado para produção)
 
       - name: Check Import Result (Optional)
         if: steps.import_step.outcome == 'success'
