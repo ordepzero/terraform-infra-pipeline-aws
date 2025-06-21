@@ -54,12 +54,6 @@ jobs:
             -backend-config="region=${{ github.event.inputs.aws_region }}" \
             -backend-config="dynamodb_table=ordepzero-sa-east-1-terraform-lock" \
             -upgrade # Garante que o provedor mais recente seja baixado se necessário
-        env:
-          # Exemplo: Se suas variáveis de ambiente para o backend forem secrets
-          # AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          # AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          # AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-          # AWS_REGION: ${{ github.event.inputs.aws_region }}
 
 
       - name: Perform Terraform Import
