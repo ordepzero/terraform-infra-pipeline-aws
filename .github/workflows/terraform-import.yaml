@@ -14,15 +14,19 @@ on:
         required: true
         type: string
       terraform_state_key:
-        description: 'Caminho completo da chave do state file S3 (ex: env:/dev/terraform-infra-pipeline-aws/terraform.tfstate)'
+        description: 'Caminho completo da chave do state file S3 (ex: env:/dev/terraform-infra-pipeline-aws)'
         required: true
         type: string
-        default: 'env:/dev/terraform-infra-pipeline-aws/terraform.tfstate'
+        default: 'env:/dev/terraform-infra-pipeline-aws'
       aws_region:
         description: 'Região AWS para o Terraform'
         required: true
         type: string
         default: 'sa-east-1'
+
+permissions:
+  id-token: write # Necessário para OIDC
+  contents: read  # Necessário para checkout do código
 
 jobs:
   import_resource:
@@ -39,6 +43,7 @@ jobs:
           # Use a role que sua esteira principal já utiliza
           role-to-assume: arn:aws:iam::533267324332:role/github-actions-ordepzero-role 
           aws-region: ${{ github.event.inputs.aws_region }}
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
