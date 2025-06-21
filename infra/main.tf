@@ -61,8 +61,8 @@ EOF
 
 resource "aws_iam_policy_attachment" "generic-attach" {
   name       = "generic-attachment-${var.enviroment}"
-  users      = [aws_iam_user.user.name]
-  roles      = [aws_iam_role.role.name]
-  groups     = [aws_iam_group.group.name]
-  policy_arn = aws_iam_policy.policy.arn
+  users      = [aws_iam_user.generic_user.name]
+  roles      = [aws_iam_role.generic_role.name]
+  groups     = [aws_iam_group.generic_group.name]
+  policy_arn = aws_iam_policy.generic_policy.arn
 }
