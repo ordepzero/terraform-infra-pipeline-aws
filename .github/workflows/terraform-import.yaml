@@ -66,11 +66,7 @@ jobs:
 
       - name: Perform Terraform Import
         working-directory: ${{ github.event.inputs.terraform_working_directory }}
-        run: |
-          terraform -var="enviroment=dev" \
-            -var="bucket_name_bovespa_raw=dev-sa-east-1-bovespa-raw" \
-            -var="bucket_name_bovespa_refined=dev-sa-east-1-bovespa-refined" \
-            import ${{ github.event.inputs.resource_address }} ${{ github.event.inputs.resource_id }}
+        run: "terraform -var=\"enviroment=dev\" -var=\"bucket_name_bovespa_raw=dev-sa-east-1-bovespa-raw\" -var=\"bucket_name_bovespa_refined=dev-sa-east-1-bovespa-refined\" import ${{ github.event.inputs.resource_address }} ${{ github.event.inputs.resource_id }}"
         id: import_step
 
       - name: Check Import Result (Optional)
