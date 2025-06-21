@@ -12,11 +12,11 @@ resource "aws_s3_bucket" "bucket_bovespa_refined" {
 ########################
 
 resource "aws_iam_user" "generic_user" {
-  name = "generic-user-${var.enviroment}"
+  name = "the-generic-user-${var.enviroment}"
 }
 
 resource "aws_iam_role" "generic_role" {
-  name = "genereic-role-${var.enviroment}"
+  name = "the-genereic-role-${var.enviroment}"
 
   assume_role_policy = <<EOF
     {
@@ -36,11 +36,11 @@ resource "aws_iam_role" "generic_role" {
     }
 
 resource "aws_iam_group" "generic_group" {
-  name = "generic-group-${var.enviroment}"
+  name = "the-generic-group-${var.enviroment}"
 }
 
 resource "aws_iam_policy" "generic_policy" {
-  name        = "generic-policy-${var.enviroment}"
+  name        = "the-generic-policy-${var.enviroment}"
   description = "A generic policy"
 
   policy = <<EOF
