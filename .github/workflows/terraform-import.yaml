@@ -67,9 +67,6 @@ jobs:
       - name: Perform Terraform Import
         working-directory: ${{ github.event.inputs.terraform_working_directory }}
         run: |
-          # Construa as opções de variáveis primeiro
-          # Certifique-se de que cada linha com -var esteja corretamente formatada
-          # sem a barra invertida, e o comando import venha depois de todas as vars.
           terraform \
             -var="enviroment=dev" \
             -var="bucket_name_bovespa_raw=dev-sa-east-1-bovespa-raw" \
