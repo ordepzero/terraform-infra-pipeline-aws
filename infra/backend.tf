@@ -1,3 +1,3 @@
-terraform {
-  backend "s3" {}
+provider "aws" {
+  region = "sa-east-1"
 }
