@@ -16,7 +16,7 @@ on:
         description: 'Caminho completo da chave do state file S3 (ex: env:/dev/terraform-infra-pipeline-aws/terraform.tfstate)'
         required: true
         type: string
-        default: 'env:/dev/terraform-infra-pipeline-aws/terraform.tfstate'
+        default: 'env:/dev/terraform-infra-pipeline-aws'
       aws_region:
         description: 'Região AWS para o Terraform'
         required: true
@@ -65,9 +65,14 @@ jobs:
             -upgrade 
 
       - name: Perform Terraform Import
-        # Usamos o 'working-directory' aqui também
         working-directory: ${{ github.event.inputs.terraform_working_directory }}
-        run: terraform import ${{ github.event.inputs.resource_address }} ${{ github.event.inputs.resource_id }}
+        run: |
+          terraform import \
+            -var="enviroment=dev" \ # Assumindo que 'enviroment' é uma GitHub Var ou Secret
+            -var="bucket_name_bovespa_raw=dev-sa-east-1-bovespa-raw" \
+            -var="bucket_name_bovespa_refined=dev-sa-east-1-bovespa-refined" \
+            ${{ github.event.inputs.resource_address }} \
+            ${{ github.event.inputs.resource_id }}
         id: import_step
 
       - name: Check Import Result (Optional)
