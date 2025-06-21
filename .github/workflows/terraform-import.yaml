@@ -16,7 +16,7 @@ on:
         description: 'Caminho completo da chave do state file S3 (ex: env:/dev/terraform-infra-pipeline-aws/terraform.tfstate)'
         required: true
         type: string
-        default: 'env:/dev/terraform-infra-pipeline-aws'
+        default: 'env:/prod/terraform-infra-pipeline-aws'
       aws_region:
         description: 'Região AWS para o Terraform'
         required: true
