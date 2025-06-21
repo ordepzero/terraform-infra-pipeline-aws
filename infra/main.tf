@@ -11,12 +11,12 @@ resource "aws_s3_bucket" "bucket_bovespa_refined" {
 ### CRIANDO UMA ROLE ###
 ########################
 
-resource "aws_iam_user" "user" {
-  name = "test-user"
+resource "aws_iam_user" "generic_user" {
+  name = "generic-user-${var.enviroment}"
 }
 
-resource "aws_iam_role" "role" {
-  name = "test-role"
+resource "aws_iam_role" "generic_role" {
+  name = "genereic-role-${var.enviroment}"
 
   assume_role_policy = <<EOF
     {
@@ -35,13 +35,13 @@ resource "aws_iam_role" "role" {
     EOF
     }
 
-resource "aws_iam_group" "group" {
-  name = "test-group"
+resource "aws_iam_group" "generic_group" {
+  name = "generic-group-${var.enviroment}"
 }
 
-resource "aws_iam_policy" "policy" {
-  name        = "test-policy"
-  description = "A test policy"
+resource "aws_iam_policy" "generic_policy" {
+  name        = "generic-policy-${var.enviroment}"
+  description = "A generic policy"
 
   policy = <<EOF
 {
@@ -59,10 +59,10 @@ resource "aws_iam_policy" "policy" {
 EOF
 }
 
-resource "aws_iam_policy_attachment" "test-attach" {
-  name       = "test-attachment"
-  users      = [aws_iam_user.user.name]
-  roles      = [aws_iam_role.role.name]
-  groups     = [aws_iam_group.group.name]
-  policy_arn = aws_iam_policy.policy.arn
+resource "aws_iam_policy_attachment" "generic-attach" {
+  name       = "generic-attachment-${var.enviroment}"
+  users      = [aws_iam_user.generic_user.name]
+  roles      = [aws_iam_role.generic_role.name]
+  groups     = [aws_iam_group.generic_group.name]
+  policy_arn = aws_iam_policy.generic_policy.arn
 }

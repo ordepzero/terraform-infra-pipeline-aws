@@ -1,0 +1,75 @@
+# .github/workflows/terraform-import.yaml
+name: Terraform Import Resource
+
+# Este workflow será disparado manualmente da aba "Actions" no GitHub
+on:
+  workflow_dispatch:
+    inputs:
+      resource_address:
+        description: 'Endereço do recurso no Terraform (ex: aws_s3_bucket.my_bucket)'
+        required: true
+        type: string
+      resource_id:
+        description: 'ID real do recurso na AWS (ex: my-bucket-name ou um ARN para IAM Policies)'
+        required: true
+        type: string
+      terraform_state_key:
+        description: 'Caminho completo da chave do state file S3 (ex: env:/dev/terraform-infra-pipeline-aws/terraform.tfstate)'
+        required: true
+        type: string
+        default: 'env:/dev/terraform-infra-pipeline-aws/terraform.tfstate'
+      aws_region:
+        description: 'Região AWS para o Terraform'
+        required: true
+        type: string
+        default: 'sa-east-1'
+
+jobs:
+  import_resource:
+    runs-on: ubuntu-latest
+    environment: dev # Defina seu ambiente, se você usa GitHub Environments
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          # Use a role que sua esteira principal já utiliza
+          role-to-assume: arn:aws:iam::533267324332:role/github-actions-ordepzero-role 
+          aws-region: ${{ github.event.inputs.aws_region }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          # Certifique-se de que esta versão corresponde à do seu projeto Terraform
+          terraform_version: 1.8.3 
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config="bucket=ordepzero-sa-east-1-terraform-statefile" \
+            -backend-config="key=${{ github.event.inputs.terraform_state_key }}" \
+            -backend-config="region=${{ github.event.inputs.aws_region }}" \
+            -backend-config="dynamodb_table=ordepzero-sa-east-1-terraform-lock" \
+            -upgrade # Garante que o provedor mais recente seja baixado se necessário
+        env:
+          # Exemplo: Se suas variáveis de ambiente para o backend forem secrets
+          # AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          # AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          # AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+          # AWS_REGION: ${{ github.event.inputs.aws_region }}
+
+
+      - name: Perform Terraform Import
+        run: terraform import ${{ github.event.inputs.resource_address }} ${{ github.event.inputs.resource_id }}
+        id: import_step
+        # continue-on-error: true # Opcional: Se quiser que o workflow continue mesmo se o import falhar (não recomendado para produção)
+
+      - name: Check Import Result (Optional)
+        if: steps.import_step.outcome == 'success'
+        run: |
+          echo "✅ Resource '${{ github.event.inputs.resource_address }}' with ID '${{ github.event.inputs.resource_id }}' imported successfully!"
+          echo "Now, run 'terraform plan' in your main pipeline to verify the state."
+        shell: bash
