@@ -66,3 +66,18 @@ resource "aws_iam_policy_attachment" "generic-attach" {
   groups     = [aws_iam_group.generic_group.name]
   policy_arn = aws_iam_policy.generic_policy.arn
 }
+
+################################################
+##### EVENTBRIDGE ##############################
+################################################
+
+resource "aws_cloudwatch_event_rule" "console" {
+  name        = "event-bridge-${var.enviroment}"
+  description = "Capture each AWS Console Sign In"
+
+  event_pattern = jsonencode({
+    detail-type = [
+      "AWS Console Sign In via CloudTrail"
+    ]
+  })
+}
