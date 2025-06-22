@@ -71,13 +71,54 @@ resource "aws_iam_policy_attachment" "generic-attach" {
 ##### EVENTBRIDGE ##############################
 ################################################
 
-resource "aws_cloudwatch_event_rule" "console" {
+resource "aws_cloudwatch_event_rule" "generic_trigger_step_function_rule" {
   name        = "event-bridge-${var.enviroment}"
-  description = "Capture each AWS Console Sign In"
+  description = "Iniciar generic stepfunction a cada 5 minutos"
+  schedule_expression = "rate(5 minutes)" 
 
   event_pattern = jsonencode({
     detail-type = [
       "AWS Console Sign In via CloudTrail"
     ]
+  })
+}
+
+resource "aws_cloudwatch_event_target" "invoke_step_function_target" {
+  rule      = aws_cloudwatch_event_rule.generic_trigger_step_function_rule.name
+  arn       = aws_sfn_state_machine.generic_step_function.arn # ARN da Step Functions
+
+  # Definindo o input JSON
+  input = jsonencode({
+    "eventName" : "ScheduledEvent",
+    "timestamp" : "$$.State.EnteredTime", # Exemplo de como usar context objects ou JSONPath
+    "data"      : {
+      "message": "Este é um input de exemplo do EventBridge!",
+      "environment": "prod",
+      "recordCount": 123
+    }
+  })
+
+  # Role para o EventBridge invocar a Step Functions
+  role_arn = aws_iam_role.generic_role.arn
+}
+
+
+################################################
+##### STEPFUNCTION #############################
+################################################
+resource "aws_sfn_state_machine" "generic_step_function" {
+  name     = "generic-stepfunction-${var.enviroment}"
+  role_arn = aws_iam_role.generic_role.arn # Role para a Step Functions executar suas tarefas
+  type     = "STANDARD" # Ou "EXPRESS"
+
+  definition = jsonencode({
+    Comment = "A simple state machine that takes input and passes it through."
+    StartAt = "PassState"
+    States = {
+      PassState = {
+        Type = "Pass"
+        End  = true
+      }
+    }
   })
 }
