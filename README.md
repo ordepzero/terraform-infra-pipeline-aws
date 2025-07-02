@@ -23,7 +23,6 @@ provider "aws" {
   region = "sa-east-1"
 }
 ```
-
 - criar o arquivo infra/backend.tf
 - indica onde o arquivo statefile será salvo
 - parâmetros serão atualizados em tempo de pipeline
@@ -31,9 +30,7 @@ provider "aws" {
 - criar o arquivo terraform.tfvars dentro de cada um dos diretórios com o conteúdo
 
 ```bash
-bucket_name = "<env>-sa-east-1-buildrun-video-pipeline"
-```
-
+bucket_name = "<env>-sa-east-1-buildrun-video-pipeline"``
 
 ### Configurar Github actions e AWS
 
