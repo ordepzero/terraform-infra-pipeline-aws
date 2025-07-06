@@ -111,6 +111,44 @@ resource "aws_iam_role" "glue_job_role" {
   })
 }
 
+# Adicione as políticas de permissão necessárias para a role do Glue Job
+# para acessar os buckets S3 e o CloudWatch Logs.
+resource "aws_iam_role_policy" "glue_job_s3_access" {
+  name = "glue-job-s3-access"
+  role = aws_iam_role.glue_job_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.bucket_bovespa_raw.arn,
+          "${aws_s3_bucket.bucket_bovespa_raw.arn}/*",
+          aws_s3_bucket.bucket_bovespa_refined.arn,
+          "${aws_s3_bucket.bucket_bovespa_refined.arn}/*",
+          aws_s3_bucket.bucket_artefatos.arn,
+          "${aws_s3_bucket.bucket_artefatos.arn}/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws-glue/jobs:*"
+      }
+    ]
+  })
+}
+
 resource "aws_glue_connection" "example" {
   name        = "example-connection"
   description = "Example Glue connection"
