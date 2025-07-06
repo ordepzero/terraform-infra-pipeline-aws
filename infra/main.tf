@@ -110,3 +110,16 @@ resource "aws_iam_role" "glue_job_role" {
     ]
   })
 }
+
+resource "aws_glue_connection" "example" {
+  name        = "example-connection"
+  description = "Example Glue connection"
+  connection_type = "NETWORK" # Ou JDBC, KAFKA, MONGODB, etc.
+  # Adicione os parâmetros de conexão necessários aqui, se aplicável.
+  # match_criteria = ["example"]
+  # physical_connection_requirements {
+  #   availability_zone = "us-east-1a"
+  #   security_group_id = ["sg-xxxxxxxxxxxxxxxxx"]
+  #   subnet_id = "subnet-xxxxxxxxxxxxxxxxx"
+  # }
+}
