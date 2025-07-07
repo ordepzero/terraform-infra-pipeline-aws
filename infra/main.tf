@@ -28,7 +28,7 @@ resource "aws_s3_bucket" "bucket_artefatos" {
 resource "aws_s3_object" "glue_etl_script" {
   bucket = aws_s3_bucket.bucket_artefatos.id
   key    = "app/src/main.py"
-  source = "app/src/main.py" # Caminho local para o seu script principal
+  source = "${path.module}/../app/src/main.py" # Caminho local para o seu script principal
   # Garanta que o arquivo 'app/src/etl_job.py' exista localmente
 }
 
