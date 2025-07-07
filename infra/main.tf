@@ -171,13 +171,14 @@ resource "aws_glue_connection" "glue_connection" {
 #####   LAMBDA INICIALIZA O GLUE JOB   ######
 #############################################
 
-resource "aws_lambda_function" "trigger_glue_job" {
+resource "aws_lambda_function" "lambda_inicia_glue_job" {
   function_name = var.lambda_name_inicia_glue_job
   role          = aws_iam_role.lambda_execution_role.arn
   handler       = "lambda_function.lambda_handler"
   runtime       = "python3.9"
 
-  source_code_hash = filebase64sha256("${path.module}/../lambda/lambda_function.zip")
+  filename         = "${path.module}/../lambda_function.zip" 
+  source_code_hash = filebase64sha256("${path.module}/../lambda_function.zip")
 
   environment {
     variables = {
@@ -232,8 +233,8 @@ resource "aws_iam_role_policy" "lambda_s3_access" {
     ]
   })
 }
-resource "aws_iam_role_policy" "lambda_glue_job_policy" {
-  name = "lambda-glue-job-policy"
+resource "aws_iam_role_policy" "lambda_policy" {
+  name = "lambda-glue-trigger-policy"
   role = aws_iam_role.lambda_execution_role.id
 
   policy = jsonencode({
@@ -242,10 +243,15 @@ resource "aws_iam_role_policy" "lambda_glue_job_policy" {
       {
         Effect = "Allow"
         Action = [
-          "glue:StartJobRun",
-          "glue:GetJobRun",
-          "glue:GetJobRuns"
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
         ]
+        Resource = "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/${var.lambda_name_inicia_glue_job}:*"
+      },
+      {
+        Effect = "Allow"
+        Action = "glue:StartJobRun"
         Resource = aws_glue_job.etl_job.arn
       }
     ]
