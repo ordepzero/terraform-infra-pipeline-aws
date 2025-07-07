@@ -255,7 +255,7 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
       {
         Effect = "Allow"
         Action = [
-         "ec2:CreateNetworkInterface",
+          "ec2:CreateNetworkInterface",
           "ec2:DeleteNetworkInterface",
           "ec2:DescribeNetworkInterfaces",
           "ec2:DescribeSubnets",
@@ -263,7 +263,8 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
           "ec2:DescribeVpcs",
           "ec2:DescribeRouteTables",
           "ec2:DescribeVpcEndpoints",
-          "ec2:Describe*"
+          "ec2:Describe*",
+          "ec2:CreateTags"
         ]
         Resource = "*"
       }]
