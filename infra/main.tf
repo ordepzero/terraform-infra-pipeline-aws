@@ -94,10 +94,6 @@ resource "aws_security_group_rule" "glue_egress_all" {
 #### ROUTE TABLE ASSOCIATION ####
 #################################
 
-data "aws_route_table" "glue_job_subnet_route_table" {
-  id = "rtb-0705d49b7f79613dd"
-}
-
 data "aws_subnet" "glue_job_subnet" {
   id = var.subnet_id # O ID da sub-rede do seu Glue Job
 }
