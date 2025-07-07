@@ -171,14 +171,20 @@ resource "aws_glue_connection" "glue_connection" {
 #####   LAMBDA INICIALIZA O GLUE JOB   ######
 #############################################
 
+data "archive_file" "lambda_function_zip" {
+  type        = "zip"
+  source_file = "${path.module}/../lambda/lambda_function.py"
+  output_path = "${path.module}/../lambda/lambda_function.py"
+}
+
 resource "aws_lambda_function" "lambda_inicia_glue_job" {
   function_name = var.lambda_name_inicia_glue_job
   role          = aws_iam_role.lambda_execution_role.arn
   handler       = "lambda_function.lambda_handler"
   runtime       = "python3.9"
 
-  filename         = "${path.module}/../lambda_function.zip" 
-  source_code_hash = filebase64sha256("${path.module}/../lambda_function.zip")
+  filename         = data.archive_file.lambda_function_zip.output_path
+  source_code_hash = data.archive_file.lambda_function_zip.output_base64sha256
 
   environment {
     variables = {
