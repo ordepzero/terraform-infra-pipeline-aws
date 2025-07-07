@@ -160,9 +160,9 @@ resource "aws_glue_connection" "example" {
   connection_type = "NETWORK" # Ou JDBC, KAFKA, MONGODB, etc.
   # Adicione os parâmetros de conexão necessários aqui, se aplicável.
   # match_criteria = ["example"]
-  # physical_connection_requirements {
-  #   availability_zone = "us-east-1a"
-  #   security_group_id = ["sg-xxxxxxxxxxxxxxxxx"]
-  #   subnet_id = "subnet-xxxxxxxxxxxxxxxxx"
-  # }
+  physical_connection_requirements {
+    availability_zone = "sa-east-1a"
+    security_group_id_list = ["sg-0c77e0a62cf6d76d9"]
+    subnet_id = "subnet-095b4b564407caf39"
+  }
 }
