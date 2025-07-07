@@ -130,8 +130,7 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
         Action = [
           "s3:GetObject",
           "s3:PutObject",
-          "s3:ListBucket",
-          "glue:GetConnection"
+          "s3:ListBucket"
         ]
         Resource = [
           aws_s3_bucket.bucket_bovespa_raw.arn,
@@ -150,8 +149,16 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
           "logs:PutLogEvents"
         ]
         Resource = "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws-glue/jobs:*"
-      }
-    ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "glue:GetConnection"
+        ]
+        # Permissão para acessar o Glue Catalog
+        # Ajuste o ARN conforme necessário para o seu Glue Catalog
+        Resource = "arn:aws:glue:sa-east-1:533267324332:catalog"
+      }]
   })
 }
 
