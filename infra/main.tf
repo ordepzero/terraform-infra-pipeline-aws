@@ -263,3 +263,34 @@ resource "aws_iam_role_policy" "lambda_policy" {
     ]
   })
 }
+
+#############################################
+#####   S3 Notification para Lambda   #######
+#############################################
+
+# Permissão para o S3 invocar a função Lambda
+resource "aws_lambda_permission" "allow_s3_to_call_lambda" {
+  statement_id  = "AllowS3InvokeLambda"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.lambda_inicia_glue_job.function_name
+  principal     = "s3.amazonaws.com"
+  # O source_arn deve ser o ARN do bucket que irá disparar a notificação
+  source_arn    = aws_s3_bucket.bucket_bovespa_raw.arn
+}
+
+# Configuração de notificação do bucket S3
+resource "aws_s3_bucket_notification" "bovespa_raw_to_lambda" {
+  bucket = aws_s3_bucket.bucket_bovespa_raw.id
+
+  # Configuração para eventos de criação de objeto (Put, Post, Copy, MultipartUpload)
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.lambda_inicia_glue_job.arn
+    events              = ["s3:ObjectCreated:*"] # Dispara para qualquer criação de objeto
+    # Opcional: prefix e/ou suffix para filtrar eventos por caminho/extensão
+    # filter_prefix       = "raw_data/"
+    # filter_suffix       = ".csv"
+  }
+
+  # Depende da permissão para garantir que a permissão seja criada antes da notificação
+  depends_on = [aws_lambda_permission.allow_s3_to_call_lambda]
+}
