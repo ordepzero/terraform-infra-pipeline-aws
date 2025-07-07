@@ -93,6 +93,11 @@ resource "aws_security_group_rule" "glue_egress_all" {
 #################################
 #### ROUTE TABLE ASSOCIATION ####
 #################################
+
+data "aws_route_table" "glue_job_subnet_route_table" {
+  id = "rtb-0705d49b7f79613dd"
+}
+
 data "aws_subnet" "glue_job_subnet" {
   id = var.subnet_id # O ID da sub-rede do seu Glue Job
 }
@@ -101,18 +106,13 @@ data "aws_subnet" "glue_job_subnet" {
 # Data source para obter a tabela de rotas da sub-rede do Glue Job
 # Isso é necessário para associar o VPC Endpoint S3 à tabela de rotas correta.
 data "aws_route_table" "glue_job_subnet_route_table" {
-  vpc_id = data.aws_subnet.glue_job_subnet.vpc_id # Usa o VPC ID da sub-rede
+  vpc_id = data.aws_subnet.glue_job_subnet.vpc_id
 
+  # Removendo o filtro "association.subnet-id" para focar na "main".
   filter {
-    name   = "association.subnet-id"
-    values = [data.aws_subnet.glue_job_subnet.id] # Filtra pela associação da sub-rede
+    name   = "association.main"
+    values = ["true"]
   }
-
-  # Opcional: Se a sub-rede estiver associada à tabela de rotas principal, você pode usar:
-  # filter {
-  #   name   = "association.main"
-  #   values = ["true"]
-  # }
 }
 
 # NOVO: VPC Endpoint de Gateway para S3
