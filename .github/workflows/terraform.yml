@@ -33,6 +33,13 @@ jobs:
         steps:
         - name: Checkout code
           uses: actions/checkout@v4
+
+        
+        - name: List contents of app/utils
+          run: |
+            echo "Listing contents of app/utils:"
+            ls -la app/utils
+            echo "--- End of app/utils contents ---"
     
         - name: Set up Terraform
           uses: hashicorp/setup-terraform@v3
