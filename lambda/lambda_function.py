@@ -14,7 +14,7 @@ def lambda_handler(event, context):
         if bucket and key:
             # Start Glue job
             response = glue.start_job_run(
-                JobName='YOUR_GLUE_JOB_NAME',  # Replace with your Glue job name
+                JobName='dev-fiap-tc02-glue-job-data-prep',  # Replace with your Glue job name
                 Arguments={
                     '--bucket': bucket,
                     '--key': key
