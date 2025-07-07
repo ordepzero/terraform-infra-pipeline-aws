@@ -35,11 +35,18 @@ jobs:
           uses: actions/checkout@v4
 
         
-        - name: List contents of app/utils
+        - name: Debug - List repository contents
           run: |
-            echo "Listing contents of app/utils:"
+            echo "Current working directory: $(pwd)"
+            echo "Listing contents of the root directory:"
+            ls -la
+            echo "Listing contents of 'app' directory:"
+            ls -la app
+            echo "Listing contents of 'app/src' directory:" # Também verificar src
+            ls -la app/src
+            echo "Listing contents of 'app/utils' directory:"
             ls -la app/utils
-            echo "--- End of app/utils contents ---"
+            echo "--- End of directory listing ---"
     
         - name: Set up Terraform
           uses: hashicorp/setup-terraform@v3
