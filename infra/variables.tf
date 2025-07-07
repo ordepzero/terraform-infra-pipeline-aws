@@ -38,3 +38,8 @@ variable "vpc_id" {
   description = "The ID of the VPC where the Lambda function will be deployed."
   type        = string
 }
+
+variable "subnet_id" {
+  description = "The subnet ID where the Lambda function will be deployed."
+  type        = string
+}
