@@ -1,4 +1,4 @@
-variable "enviroment" {
+variable "environment" {
   description = "The environment for which the infrastructure is being provisioned. It can be 'dev', 'hom', or 'prod'."
   type        = string
 }
@@ -31,5 +31,10 @@ variable "lambda_name_scrap_b3" {
 
 variable "lambda_name_inicia_glue_job" {
   description = "The name of the Lambda function that starts the Glue job."
+  type        = string
+}
+
+variable "vpc_id" {
+  description = "The ID of the VPC where the Lambda function will be deployed."
   type        = string
 }

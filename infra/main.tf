@@ -52,6 +52,61 @@ resource "aws_s3_object" "glue_python_libraries" {
 }
 
 
+############################
+####   SECURITY GROUPS   ###
+############################
+
+resource "aws_security_group" "glue_job_security_group" {
+  name        = "${var.environment}-glue-job-sg"
+  description = "Security group for AWS Glue jobs in VPC"
+  vpc_id      = var.vpc_id # Você precisará definir esta variável (o ID da sua VPC)
+
+  tags = {
+    Name = "${var.environment}-glue-job-sg"
+  }
+}
+
+# Regra de Security Group para permitir todo o tráfego de entrada do próprio SG
+# Isso é necessário para a comunicação interna dos componentes do Glue Job na VPC.
+resource "aws_security_group_rule" "glue_self_ingress_all" {
+  type              = "ingress"
+  from_port         = 0
+  to_port           = 65535
+  protocol          = -1 # -1 significa todos os protocolos
+  security_group_id = aws_security_group.glue_job_security_group.id
+  self              = true # Permite tráfego de e para o próprio Security Group
+  description       = "Required for AWS Glue internal communication within VPC"
+}
+
+# Regra de Security Group para permitir todo o tráfego de saída
+# Isso é comum para Glue Jobs, permitindo acesso a S3, CloudWatch, etc.
+resource "aws_security_group_rule" "glue_egress_all" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1" # -1 significa todos os protocolos
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.glue_job_security_group.id
+  description       = "Allow all outbound traffic"
+}
+
+
+###########################
+###   GLUE CONNECTION   ###
+###########################
+resource "aws_glue_connection" "glue_connection" {
+  name        = "glue_connection"
+  description = "Glue connection"
+  connection_type = "NETWORK" # Ou JDBC, KAFKA, MONGODB, etc.
+  physical_connection_requirements {
+    availability_zone = "sa-east-1a"
+    # Agora referenciamos o ID do Security Group que acabamos de criar
+    security_group_id_list = [aws_security_group.glue_job_security_group.id] 
+    subnet_id = "subnet-095b4b564407caf39"
+  }
+}
+
+
 ########################
 ###    GLUE JOB      ###
 ########################
@@ -165,25 +220,18 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
       {
         Effect = "Allow"
         Action = [
-          "ec2:*"
+         "ec2:CreateNetworkInterface",
+          "ec2:DeleteNetworkInterface",
+          "ec2:DescribeNetworkInterfaces",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeVpcs"
         ]
         Resource = "*"
       }]
   })
 }
 
-resource "aws_glue_connection" "glue_connection" {
-  name        = "glue_connection"
-  description = "Glue connection"
-  connection_type = "NETWORK" # Ou JDBC, KAFKA, MONGODB, etc.
-  # Adicione os parâmetros de conexão necessários aqui, se aplicável.
-  # match_criteria = ["example"]
-  physical_connection_requirements {
-    availability_zone = "sa-east-1a"
-    security_group_id_list = ["sg-0c77e0a62cf6d76d9"]
-    subnet_id = "subnet-095b4b564407caf39"
-  }
-}
 
 #############################################
 #####   LAMBDA INICIALIZA O GLUE JOB   ######
