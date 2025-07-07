@@ -1,6 +1,9 @@
 # Data source para obter a região atual
 data "aws_region" "current" {}
 
+# Data source para obter o ID da conta AWS (necessário para a política de logs)
+data "aws_caller_identity" "current" {}
+
 ########################
 ###   RECURSOS S3    ###
 ########################
@@ -83,6 +86,7 @@ resource "aws_glue_job" "etl_job" {
     "--enable-continuous-log-filter"     = "true"
     "--enable-metrics"                   = ""
     "--enable-auto-scaling"              = "true"
+    "--extra-py-files"                   = "s3://${aws_s3_bucket.bucket_artefatos.bucket}/utils.zip"
   }
 
   execution_property {
