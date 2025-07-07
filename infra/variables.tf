@@ -17,3 +17,9 @@ variable "bucket_name_artefatos" {
   description = "The name of the S3 bucket armazenar os scripts."
   type        = string
 }
+
+
+variable "glue_job_data_prep" {
+  description = "The name of the Glue job data preparation."
+  type        = string
+}

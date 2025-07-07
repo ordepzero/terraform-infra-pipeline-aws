@@ -58,15 +58,15 @@ resource "aws_s3_object" "glue_python_libraries" {
 
 
 resource "aws_glue_job" "etl_job" {
-  name              = "example-etl-job"
-  description       = "An example Glue ETL job"
+  name              = var.glue_job_data_prep
+  description       = "Glue ETL job"
   role_arn          = aws_iam_role.glue_job_role.arn
   glue_version      = "5.0"
   max_retries       = 0
   timeout           = 5
   number_of_workers = 2
   worker_type       = "G.1X"
-  connections       = [aws_glue_connection.example.name]
+  connections       = [aws_glue_connection.glue_connection.name]
   execution_class   = "STANDARD"
 
   command {
@@ -154,9 +154,9 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
   })
 }
 
-resource "aws_glue_connection" "example" {
-  name        = "example-connection"
-  description = "Example Glue connection"
+resource "aws_glue_connection" "glue_connection" {
+  name        = "glue_connection"
+  description = "Glue connection"
   connection_type = "NETWORK" # Ou JDBC, KAFKA, MONGODB, etc.
   # Adicione os parâmetros de conexão necessários aqui, se aplicável.
   # match_criteria = ["example"]
