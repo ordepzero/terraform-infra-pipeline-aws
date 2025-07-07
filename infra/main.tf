@@ -93,14 +93,25 @@ resource "aws_security_group_rule" "glue_egress_all" {
 #################################
 #### ROUTE TABLE ASSOCIATION ####
 #################################
+data "aws_subnet" "glue_job_subnet" {
+  id = var.subnet_id # O ID da sub-rede do seu Glue Job
+}
+
+
 # Data source para obter a tabela de rotas da sub-rede do Glue Job
 # Isso é necessário para associar o VPC Endpoint S3 à tabela de rotas correta.
 data "aws_route_table" "glue_job_subnet_route_table" {
-  subnet_id = var.subnet_id # O ID da sub-rede do seu Glue Job
-  # Opcional: filter para garantir que seja a tabela de rotas principal ou específica
+  vpc_id = data.aws_subnet.glue_job_subnet.vpc_id # Usa o VPC ID da sub-rede
+
+  filter {
+    name   = "association.subnet-id"
+    values = [data.aws_subnet.glue_job_subnet.id] # Filtra pela associação da sub-rede
+  }
+
+  # Opcional: Se a sub-rede estiver associada à tabela de rotas principal, você pode usar:
   # filter {
-  #   name   = "association.subnet-id"
-  #   values = ["subnet-095b4b564407caf39"]
+  #   name   = "association.main"
+  #   values = ["true"]
   # }
 }
 
@@ -108,7 +119,7 @@ data "aws_route_table" "glue_job_subnet_route_table" {
 # Permite que o Glue Job acesse o S3 de dentro da VPC sem precisar de NAT Gateway ou Internet Gateway.
 resource "aws_vpc_endpoint" "s3_gateway_endpoint" {
   vpc_id       = var.vpc_id
-  service_name = "com.amazonaws.${data.aws_region.current.name}.s3"
+  service_name = "com.amazonaws.${data.aws_region.current.region}.s3"
   vpc_endpoint_type = "Gateway" # Tipo Gateway para S3
 
   # Associa o endpoint à tabela de rotas da sub-rede do Glue Job
@@ -130,7 +141,7 @@ resource "aws_glue_connection" "glue_connection" {
     availability_zone = "sa-east-1a"
     # Agora referenciamos o ID do Security Group que acabamos de criar
     security_group_id_list = [aws_security_group.glue_job_security_group.id] 
-    subnet_id = "subnet-095b4b564407caf39"
+    subnet_id = var.subnet_id
   }
 }
 
