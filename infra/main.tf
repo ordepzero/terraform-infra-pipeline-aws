@@ -29,7 +29,7 @@ resource "aws_s3_object" "glue_etl_script" {
   bucket = aws_s3_bucket.bucket_artefatos.id
   key    = "app/src/main.py"
   source = "${path.module}/../app/src/main.py" # Caminho local para o seu script principal
-  # Garanta que o arquivo 'app/src/etl_job.py' exista localmente
+  etag   = filemd5("${path.module}/../app/src/main.py")
 }
 
 # 2. Criação do arquivo ZIP do diretório 'app/utils'
