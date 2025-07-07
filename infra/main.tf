@@ -130,7 +130,8 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
         Action = [
           "s3:GetObject",
           "s3:PutObject",
-          "s3:ListBucket"
+          "s3:ListBucket",
+          "glue:GetConnection"
         ]
         Resource = [
           aws_s3_bucket.bucket_bovespa_raw.arn,
