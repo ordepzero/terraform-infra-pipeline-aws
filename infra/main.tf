@@ -166,3 +166,88 @@ resource "aws_glue_connection" "glue_connection" {
     subnet_id = "subnet-095b4b564407caf39"
   }
 }
+
+#############################################
+#####   LAMBDA INICIALIZA O GLUE JOB   ######
+#############################################
+
+resource "aws_lambda_function" "trigger_glue_job" {
+  function_name = var.lambda_name_inicia_glue_job
+  role          = aws_iam_role.lambda_execution_role.arn
+  handler       = "lambda_function.lambda_handler"
+  runtime       = "python3.9"
+
+  source_code_hash = filebase64sha256("${path.module}/../lambda/lambda_function.zip")
+
+  environment {
+    variables = {
+      GLUE_JOB_NAME = aws_glue_job.etl_job.name
+    }
+  }
+
+  tags = {
+    "ManagedBy" = "AWS"
+  }
+}
+
+resource "aws_iam_role" "lambda_execution_role" {
+  name = "lambda-execution-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+resource "aws_iam_role_policy" "lambda_s3_access" {
+  name = "lambda-s3-access"
+  role = aws_iam_role.lambda_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.bucket_bovespa_raw.arn,
+          "${aws_s3_bucket.bucket_bovespa_raw.arn}/*",
+          aws_s3_bucket.bucket_bovespa_refined.arn,
+          "${aws_s3_bucket.bucket_bovespa_refined.arn}/*",
+          aws_s3_bucket.bucket_artefatos.arn,
+          "${aws_s3_bucket.bucket_artefatos.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+resource "aws_iam_role_policy" "lambda_glue_job_policy" {
+  name = "lambda-glue-job-policy"
+  role = aws_iam_role.lambda_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "glue:StartJobRun",
+          "glue:GetJobRun",
+          "glue:GetJobRuns"
+        ]
+        Resource = aws_glue_job.etl_job.arn
+      }
+    ]
+  })
+}

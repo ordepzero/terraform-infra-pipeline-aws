@@ -1,4 +1,3 @@
-
 from pyspark.sql import SparkSession
 from awsglue.context import GlueContext 
 from awsglue.transforms import *
@@ -7,6 +6,7 @@ from awsglue.utils import getResolvedOptions
 from awsglue.job import Job
 from pyspark.sql.functions import year, month, dayofmonth 
 import sys
+
 class JobELT83:
     def __init__(self, spark, glueContext, input_path, output_path, database_name, table_name):
         self.spark = spark

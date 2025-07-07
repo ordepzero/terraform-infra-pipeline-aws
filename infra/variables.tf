@@ -23,3 +23,8 @@ variable "glue_job_data_prep" {
   description = "The name of the Glue job data preparation."
   type        = string
 }
+
+variable "lambda_name_inicia_glue_job" {
+  description = "The name of the Lambda function that starts the Glue job."
+  type        = string
+}
