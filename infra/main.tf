@@ -157,7 +157,10 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
         ]
         # Permissão para acessar o Glue Catalog
         # Ajuste o ARN conforme necessário para o seu Glue Catalog
-        Resource = "arn:aws:glue:sa-east-1:533267324332:catalog"
+        Resource = [
+            "arn:aws:glue:sa-east-1:533267324332:catalog",
+            "arn:aws:glue:sa-east-1:533267324332:connection/*"
+            ]
       }]
   })
 }
