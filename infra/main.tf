@@ -36,8 +36,8 @@ resource "aws_s3_object" "glue_etl_script" {
 # Este data source cria um arquivo ZIP localmente.
 data "archive_file" "python_utils_zip" {
   type        = "zip"
-  source_dir  = "app/utils" # Caminho local para o diretório de utilitários
-  output_path = "utils.zip" # Nome do arquivo ZIP que será criado localmente
+  source_dir  = "app/utils/" # Caminho local para o diretório de utilitários
+  output_path = "app/utils.zip" # Nome do arquivo ZIP que será criado localmente
   # Garanta que o diretório 'app/utils' exista localmente
 }
 
