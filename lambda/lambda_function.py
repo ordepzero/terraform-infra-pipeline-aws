@@ -1,9 +1,12 @@
 import json
 import boto3
+import os
 
 glue = boto3.client('glue')
 
 def lambda_handler(event, context):
+    glue_job_name = os.environ.get('GLUE_JOB_NAME')
+
     # Extract bucket and object key from the S3 event
     for record in event.get('Records', []):
         s3_info = record.get('s3', {})
@@ -14,7 +17,7 @@ def lambda_handler(event, context):
         if bucket and key:
             # Start Glue job
             response = glue.start_job_run(
-                JobName='dev-fiap-tc02-glue-job-data-prep',  # Replace with your Glue job name
+                JobName=glue_job_name,  # Replace with your Glue job name
                 Arguments={
                     '--bucket': bucket,
                     '--key': key

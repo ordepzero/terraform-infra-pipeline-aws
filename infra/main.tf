@@ -293,7 +293,7 @@ resource "aws_lambda_function" "lambda_inicia_glue_job" {
 
   environment {
     variables = {
-      GLUE_JOB_NAME = aws_glue_job.etl_job.name
+      GLUE_JOB_NAME = var.glue_job_data_prep
     }
   }
 
