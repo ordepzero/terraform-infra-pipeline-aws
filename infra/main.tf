@@ -409,7 +409,7 @@ module "lambda_functions_scrapper" {
 
   function_name = var.lambda_name_scrap_b3
   description   = var.lambda_name_scrap_b3
-  handler       = "lambda_function.lambda_handler"
+  handler       = "lambda_functions_scrapper.lambda_handler"
   runtime       = "python3.12"
 
   source_path = "${path.module}/../lambda/lambda_functions_scrapper.py"
