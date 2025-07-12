@@ -410,9 +410,11 @@ module "lambda_functions_scrapper" {
   function_name = var.lambda_name_scrap_b3
   description   = var.lambda_name_scrap_b3
   handler       = "lambda_functions_scrapper.lambda_handler"
-  runtime       = "python3.12"
+  runtime       = "python3.13"
 
   source_path = "${path.module}/../lambda/lambda_functions_scrapper.py"
+  memory_size = 512
+  timeout     = 60
 
   layers = [var.lambda_layer_scrapper_artefatos_arn]
 
