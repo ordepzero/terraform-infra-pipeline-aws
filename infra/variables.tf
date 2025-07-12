@@ -34,6 +34,12 @@ variable "lambda_name_inicia_glue_job" {
   type        = string
 }
 
+variable "lambda_layer_scrapper_artefatos_arn" {
+  description = "The name of the Lambda layer that contains the scrapper artifacts."
+  type        = string
+  
+}
+
 variable "vpc_id" {
   description = "The ID of the VPC where the Lambda function will be deployed."
   type        = string

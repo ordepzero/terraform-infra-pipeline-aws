@@ -399,3 +399,53 @@ resource "aws_s3_bucket_notification" "bovespa_raw_to_lambda" {
   # Depende da permissão para garantir que a permissão seja criada antes da notificação
   depends_on = [aws_lambda_permission.allow_s3_to_call_lambda]
 }
+
+#############################################
+#####   LAMBDA SCRAPPER SALVA PARQUET  ######
+#############################################
+
+module "lambda_functions_scrapper" {
+  source = "terraform-aws-modules/lambda/aws"
+
+  function_name = var.lambda_name_scrap_b3
+  description   = var.lambda_name_scrap_b3
+  handler       = "lambda_function.lambda_handler"
+  runtime       = "python3.12"
+
+  source_path = "${path.module}/../lambda/lambda_functions_scrapper.py"
+
+  layers = [var.lambda_layer_scrapper_artefatos_arn]
+
+  tags = {
+    Name = "my-lambda1"
+  }
+}
+
+############################################################
+#### Agendador (EventBridge Rule) para a função Lambda  ####
+############################################################
+resource "aws_cloudwatch_event_rule" "ibov_scraper_schedule" {
+  name                = "ibov-scraper-daily-schedule"
+  description         = "Agenda a execução da função Lambda de scraping do IBovespa diariamente."
+  schedule_expression = "cron(0 12 * * ? *)" # Exemplo: executa a cada 1 dia. Use "cron(0 12 * * ? *)" para 12:00 UTC diariamente.
+  state          = "ENABLED"
+  tags = {
+    Name = "ibov-scraper-schedule"
+  }
+}
+
+# Permissão para o EventBridge invocar a função Lambda
+resource "aws_lambda_permission" "allow_cloudwatch_to_call_ibov_scraper" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambda_functions_scrapper.lambda_function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.ibov_scraper_schedule.arn
+}
+
+# Define o alvo do agendador (a função Lambda)
+resource "aws_cloudwatch_event_target" "ibov_scraper_target" {
+  rule      = aws_cloudwatch_event_rule.ibov_scraper_schedule.name
+  target_id = "ibov-scraper-lambda-target"
+  arn       = module.ibov_scraper_lambda.lambda_function_arn
+}
