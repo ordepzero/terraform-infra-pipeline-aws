@@ -418,6 +418,10 @@ module "lambda_functions_scrapper" {
 
   layers = [var.lambda_layer_scrapper_artefatos_arn]
 
+  environment_variables = {
+    S3_BUCKET_NAME = var.bucket_name_bovespa_bruto
+  }
+
   tags = {
     Name = "my-lambda1"
   }
