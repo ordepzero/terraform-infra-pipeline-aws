@@ -447,5 +447,5 @@ resource "aws_lambda_permission" "allow_cloudwatch_to_call_ibov_scraper" {
 resource "aws_cloudwatch_event_target" "ibov_scraper_target" {
   rule      = aws_cloudwatch_event_rule.ibov_scraper_schedule.name
   target_id = "ibov-scraper-lambda-target"
-  arn       = module.ibov_scraper_lambda.lambda_function_arn
+  arn       = module.lambda_functions_scrapper.lambda_function_arn
 }
