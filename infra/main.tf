@@ -406,7 +406,7 @@ resource "aws_s3_bucket_notification" "bovespa_raw_to_lambda" {
 
 module "lambda_functions_scrapper" {
   source = "terraform-aws-modules/lambda/aws"
-
+  
   function_name = var.lambda_name_scrap_b3
   description   = var.lambda_name_scrap_b3
   handler       = "lambda_functions_scrapper.lambda_handler"
@@ -415,12 +415,13 @@ module "lambda_functions_scrapper" {
   source_path = "${path.module}/../lambda/lambda_functions_scrapper.py"
   memory_size = 512
   timeout     = 60
-
-  layers = [var.lambda_layer_scrapper_artefatos_arn]
-
+  create_role = false
+  role_arn    = aws_iam_role.lambda_execution_role.arn
   environment_variables = {
     S3_BUCKET_NAME = var.bucket_name_bovespa_bruto
   }
+
+  layers = [var.lambda_layer_scrapper_artefatos_arn]
 
   tags = {
     Name = "my-lambda1"
