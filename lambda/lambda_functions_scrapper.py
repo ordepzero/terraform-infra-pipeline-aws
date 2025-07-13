@@ -4,26 +4,29 @@ import base64
 import json
 import os
 from datetime import datetime
-import boto3 
+import boto3 # Importa a biblioteca boto3 para interagir com serviços AWS como S3 e Glue
+
+# Inicializa o cliente Glue fora da função para reutilização (melhor prática em Lambda)
+glue_client = boto3.client('glue')
 
 def lambda_handler(event=None, context=None):
-    # URL base da API. A parte final é um parâmetro codificado em base64.
+    """
+    Função Lambda para fazer o scraping dos dados da carteira teórica do IBovespa da B3
+    usando a API direta e salvar os dados em formato Parquet no S3,
+    além de atualizar o AWS Glue Data Catalog de forma dinâmica.
+    """
     api_params = {
         "language": "pt-br",
         "pageNumber": 1,
-        "pageSize": 150,
+        "pageSize": 100,
         "index": "IBOV",
         "segment": "1"
     }
 
-    # Permite que os parâmetros sejam configurados via evento Lambda
     if event and isinstance(event, dict):
         api_params.update(event.get('api_params', {}))
 
-    # Codifica os parâmetros em base64
     encoded_params = base64.b64encode(json.dumps(api_params).encode('utf-8')).decode('utf-8')
-
-    # Constrói a URL da API com os parâmetros codificados
     api_url = f'https://sistemaswebb3-listados.b3.com.br/indexProxy/indexCall/GetPortfolioDay/{encoded_params}'
 
     headers = {
@@ -65,8 +68,7 @@ def lambda_handler(event=None, context=None):
         if 'results' in data and data['results']:
             df = pd.DataFrame(data['results'])
 
-            # --- Lógica para salvar em Parquet no S3 usando /tmp e boto3 ---
-            s3_bucket_name = os.environ.get('S3_BUCKET_NAME') # Obter do ambiente, sem valor padrão 'seu-bucket-s3-aqui'
+            s3_bucket_name = os.environ.get('S3_BUCKET_NAME')
             
             if not s3_bucket_name:
                 print("ERRO: A variável de ambiente 'S3_BUCKET_NAME' não foi configurada.")
@@ -75,34 +77,108 @@ def lambda_handler(event=None, context=None):
                     'body': json.dumps({"message": "Nome do bucket S3 não configurado. Por favor, defina a variável de ambiente 'S3_BUCKET_NAME'."})
                 }
 
-            # Obtém a data atual para a estrutura de diretórios
             now = datetime.now()
             year = now.year
             month = now.month
             day = now.day
-
-            # Constrói o caminho do arquivo no S3
-            s3_key = f"ibov_data/year={year}/month={month:02d}/day={day:02d}/data.parquet"
             
-            # Define o caminho temporário no sistema de arquivos da Lambda
-            temp_file_path = f"/tmp/ibov_data_{now.strftime('%Y%m%d%H%M%S')}.parquet"
+            # --- Adicionar lógica para atualizar o AWS Glue Data Catalog ---
+            glue_database_name = os.environ.get('GLUE_DATABASE_NAME', 'raw_database_name') # Nome do seu banco de dados Glue
+            glue_table_name = os.environ.get('GLUE_TABLE_NAME', 'tb_fiap_tech02_bovespa_raw') # Nome da sua tabela Glue
+
+            # Define o caminho S3 para o arquivo Parquet
+            s3_key_prefix = f"{glue_table_name}/year={year}/month={month:02d}/day={day:02d}/"
+            s3_file_name = "data.parquet"
+            s3_full_key = s3_key_prefix + s3_file_name
+            
+            temp_file_path = f"/tmp/{glue_table_name}_{now.strftime('%Y%m%d%H%M%S')}.parquet"
 
             print(f"Salvando dados temporariamente em: {temp_file_path}")
-            df.to_parquet(temp_file_path, index=False) # Salva no /tmp
+            df.to_parquet(temp_file_path, index=False)
 
-            # Inicializa o cliente S3
             s3_client = boto3.client('s3')
+            print(f"Fazendo upload de {temp_file_path} para s3://{s3_bucket_name}/{s3_full_key}")
+            s3_client.upload_file(temp_file_path, s3_bucket_name, s3_full_key)
 
-            print(f"Fazendo upload de {temp_file_path} para s3://{s3_bucket_name}/{s3_key}")
-            s3_client.upload_file(temp_file_path, s3_bucket_name, s3_key)
-
-            # Opcional: Remover o arquivo temporário após o upload
             os.remove(temp_file_path)
             print(f"Arquivo temporário {temp_file_path} removido.")
 
+            print(f"Obtendo informações da tabela Glue '{glue_table_name}' no banco de dados '{glue_database_name}'...")
+            table_info = None
+            try:
+                response_get_table = glue_client.get_table(
+                    DatabaseName=glue_database_name,
+                    Name=glue_table_name
+                )
+                table_info = response_get_table['Table']
+                print("Informações da tabela obtidas com sucesso.")
+            except glue_client.exceptions.EntityNotFoundException:
+                print(f"ERRO: Tabela Glue '{glue_table_name}' não encontrada no banco de dados '{glue_database_name}'.")
+                return {
+                    'statusCode': 404,
+                    'body': json.dumps({"message": f"Tabela Glue não encontrada: {glue_database_name}.{glue_table_name}"})
+                }
+            except Exception as get_table_e:
+                print(f"ERRO ao obter informações da tabela Glue: {get_table_e}")
+                return {
+                    'statusCode': 500,
+                    'body': json.dumps({"message": f"Erro ao obter informações da tabela Glue: {str(get_table_e)}"})
+                }
+
+            # Extrair colunas e chaves de partição dinamicamente
+            table_columns = table_info['StorageDescriptor']['Columns']
+            table_partition_keys = table_info.get('PartitionKeys', [])
+
+            # Preparar valores das partições com base nas chaves de partição
+            partition_values = []
+            # Assumimos que as chaves de partição são 'year', 'month', 'day' nesta ordem
+            # Se a ordem ou os nomes forem diferentes, esta lógica precisará ser ajustada
+            # baseada em `table_partition_keys`.
+            # Exemplo mais robusto:
+            for pk in table_partition_keys:
+                if pk['Name'] == 'year':
+                    partition_values.append(str(year))
+                elif pk['Name'] == 'month':
+                    partition_values.append(f"{month:02d}")
+                elif pk['Name'] == 'day':
+                    partition_values.append(f"{day:02d}")
+                else:
+                    # Lidar com outras chaves de partição se existirem
+                    print(f"AVISO: Chave de partição '{pk['Name']}' não tratada explicitamente na lógica de valores.")
+                    # Você pode adicionar um valor padrão ou levantar um erro
+                    partition_values.append('unknown') # Ou levantar um erro
+
+            print(f"Atualizando partição no Glue Catalog para {glue_database_name}.{glue_table_name} com valores: {partition_values}...")
+            
+            try:
+                glue_client.create_partition(
+                    DatabaseName=glue_database_name,
+                    TableName=glue_table_name,
+                    PartitionInput={
+                        'Values': partition_values, # Usando valores de partição dinâmicos
+                        'StorageDescriptor': {
+                            'Location': f"s3://{s3_bucket_name}/{s3_key_prefix}", # Caminho S3 da partição
+                            'InputFormat': table_info['StorageDescriptor']['InputFormat'], # Dinâmico
+                            'OutputFormat': table_info['StorageDescriptor']['OutputFormat'], # Dinâmico
+                            'SerdeInfo': table_info['StorageDescriptor']['SerdeInfo'], # Dinâmico
+                            'Columns': table_columns # Usando colunas dinâmicas
+                        }
+                    }
+                )
+                print("Partição adicionada/atualizada no Glue Catalog com sucesso.")
+            except glue_client.exceptions.AlreadyExistsException:
+                print("Partição já existe no Glue Catalog. Nenhuma ação necessária.")
+            except Exception as glue_e:
+                print(f"ERRO ao atualizar o Glue Catalog: {glue_e}")
+                return {
+                    'statusCode': 500,
+                    'body': json.dumps({"message": f"Dados salvos, mas erro ao atualizar Glue Catalog: {str(glue_e)}"})
+                }
+            # --- Fim da lógica de atualização do AWS Glue Data Catalog ---
+
             return {
                 'statusCode': 200,
-                'body': json.dumps({"message": f"Dados raspados e salvos com sucesso em s3://{s3_bucket_name}/{s3_key}"})
+                'body': json.dumps({"message": f"Dados raspados e salvos com sucesso em s3://{s3_bucket_name}/{s3_full_key} e partição Glue atualizada."})
             }
         else:
             print("Erro: A chave 'results' não foi encontrada na resposta JSON ou está vazia.")
@@ -130,3 +206,28 @@ def lambda_handler(event=None, context=None):
             'statusCode': 500,
             'body': json.dumps({"message": f"Erro inesperado: {str(e)}"})
         }
+
+# Bloco para testar a função localmente, simulando uma invocação Lambda
+if __name__ == "__main__":
+    print("Testando a função Lambda localmente...")
+    # Para testar localmente o salvamento em S3, você precisaria configurar
+    # credenciais AWS no seu ambiente local (ex: variáveis de ambiente AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+    # e ter o 'pyarrow' e 'boto3' instalados.
+    
+    # Defina um nome de bucket S3 para teste local (substitua por um bucket real que você tenha acesso)
+    os.environ['S3_BUCKET_NAME'] = 'dev-533267324332-fiap-tc02-dados-brutos-bovespa' 
+    os.environ['GLUE_DATABASE_NAME'] = 'raw_database_name' # Nome do seu banco de dados Glue para teste
+    os.environ['GLUE_TABLE_NAME'] = 'tb_fiap_tech02_bovespa_raw' # Nome da sua tabela Glue para teste
+
+
+    test_event = {} # Usar parâmetros padrão para a API
+
+    response_from_lambda = lambda_handler(test_event, None)
+
+    print("\nResposta da função Lambda:")
+    print(json.dumps(response_from_lambda, indent=2))
+
+    if response_from_lambda['statusCode'] == 200:
+        print("\nOperação de scraping e salvamento em Parquet (simulada) concluída com sucesso.")
+    else:
+        print("\nA função Lambda retornou um erro durante o scraping ou salvamento.")
