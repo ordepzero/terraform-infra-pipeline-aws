@@ -478,5 +478,6 @@ module "raw_layer_tables" {
   environment                = var.environment
   bucket_name_bovespa_bruto  = var.bucket_name_bovespa_bruto
   table_bovespa_raw          = var.table_bovespa_raw
+  
   depends_on = [aws_glue_catalog_database.raw_database, aws_s3_bucket.bucket_bovespa_raw]
 }
