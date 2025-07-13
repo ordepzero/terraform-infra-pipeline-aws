@@ -343,7 +343,8 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
       {
         Effect = "Allow",
         Action = [
-          "cloudwatch:PutMetricData"
+          "cloudwatch:PutMetricData",
+          "logs:CreateLogGroup"
         ],
         # A permissão para métricas não é vinculada a um recurso específico
         Resource = "*"
