@@ -1,7 +1,7 @@
 # modules/raw_layer/raw_sales.tf
 
 module "raw_sales_data" {
-  source = "../glue_table" # Caminho relativo para o módulo glue_table
+  source = "../glue_parquet_table" # Caminho relativo para o módulo glue_table
 
   table_name    = "sales_raw"
   database_name = var.database_name
