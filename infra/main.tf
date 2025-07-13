@@ -329,6 +329,14 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
         Resource = [
             "arn:aws:athena:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workgroup/primary"
             ]
+      },
+      {
+        Effect = "Allow",
+        Action = [
+          "cloudwatch:PutMetricData"
+        ],
+        # A permissão para métricas não é vinculada a um recurso específico
+        Resource = "*"
       }
       ]
   })

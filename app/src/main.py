@@ -105,19 +105,23 @@ class JobELTB3:
     def transform_dataframe(self, df):
         try:
             print("Iniciando tratamento rename columns ...")
-            df = df.withColumnRenamed("Código", "codigo_bovespa") \
-                   .withColumnRenamed("Ação", "nome_acao") \
-                   .withColumnRenamed("tipo", "nome_tipo_acao") \
-                   .withColumnRenamed("Qtde. Teórica", "quantidade_teorica") \
-                   .withColumnRenamed("Part. (%)", "percentual_participacao_acao")
+            df = df.withColumnRenamed("segment", "segmento") \
+                   .withColumnRenamed("cod", "codigo_bovespa") \
+                   .withColumnRenamed("asset", "nome_acao") \
+                   .withColumnRenamed("type", "nome_tipo_acao") \
+                   .withColumnRenamed("part", "percentual_participacao_acao") \
+                   .withColumnRenamed("partacum", "percentual_participacao_acumulada") \
+                   .withColumnRenamed("theoricalqty", "quantidade_teorica")
             
 
             print("types columns ...")
-            df = df.withColumn("codigo_bovespa", df["codigo_bovespa"].cast("string")) \
+            df = df.withColumn("segmento", df["segmento"].cast("string")) \
+                   .withColumn("codigo_bovespa", df["codigo_bovespa"].cast("string")) \
                    .withColumn("nome_acao", df["nome_acao"].cast("string")) \
                    .withColumn("nome_tipo_acao", df["nome_tipo_acao"].cast("string")) \
-                   .withColumn("quantidade_teorica", df["quantidade_teorica"].cast("decimal(18,2)")) \
-                   .withColumn("percentual_participacao_acao",regexp_replace(col("percentual_participacao_acao"), ",", ".").cast("decimal(18,2)"))
+                   .withColumn("quantidade_teorica", df["quantidade_teorica"].cast("decimal(18,0)")) \
+                   .withColumn("percentual_participacao_acumulada", regexp_replace(col("percentual_participacao_acumulada"), ".", "").cast("decimal(18,3)")) \
+                   .withColumn("percentual_participacao_acao",regexp_replace(col("percentual_participacao_acao"), ",", ".").cast("decimal(3,3)"))
                    
             return df
         except Exception as e:
@@ -127,10 +131,10 @@ class JobELTB3:
     def run(self):
         try:
             df_full_b3 = self.read_parquet_from_s3()
-            df_full_b3 = self.adicionar_data_pregao(df_full_b3)
-            df_full_b3 = self.transform_dataframe(df_full_b3)
-            self.write_parquet_to_s3(df_full_b3)
-            
+            #df_full_b3 = self.adicionar_data_pregao(df_full_b3)
+            #df_full_b3 = self.transform_dataframe(df_full_b3)
+            #self.write_parquet_to_s3(df_full_b3)
+            df_full_b3.show()
             # O método update_glue_catalog não precisa mais do dataframe
             self.update_glue_catalog()
 
