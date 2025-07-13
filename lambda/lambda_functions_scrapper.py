@@ -18,9 +18,9 @@ def lambda_handler(event=None, context=None):
     api_params = {
         "language": "pt-br",
         "pageNumber": 1,
-        "pageSize": 100,
+        "pageSize": 120,
         "index": "IBOV",
-        "segment": "1"
+        "segment": "2"
     }
 
     if event and isinstance(event, dict):
