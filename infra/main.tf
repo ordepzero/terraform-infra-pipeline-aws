@@ -143,11 +143,13 @@ resource "aws_vpc_endpoint" "logs_interface_endpoint" {
 
 # NOVO: VPC Endpoint de Gateway para Athena
 # Permite que o Glue Job execute queries no Athena de dentro da VPC.
-resource "aws_vpc_endpoint" "athena_gateway_endpoint" {
-  vpc_id       = var.vpc_id
-  service_name = "com.amazonaws.${data.aws_region.current.region}.athena"
-  vpc_endpoint_type = "Gateway"
-  route_table_ids = [data.aws_route_table.glue_job_subnet_route_table.id]
+resource "aws_vpc_endpoint" "athena_interface_endpoint" {
+  vpc_id            = var.vpc_id
+  service_name      = "com.amazonaws.${data.aws_region.current.region}.athena"
+  vpc_endpoint_type = "Interface"
+
+  subnet_ids         = [var.subnet_id]
+  security_group_ids = [aws_security_group.glue_job_security_group.id]
 }
 
 ###########################
