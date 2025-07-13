@@ -1,9 +1,5 @@
 resource "aws_glue_catalog_database" "example" {
-  name = "MyCatalogDatabase"
-}
-
-resource "aws_glue_catalog_database" "example" {
-  name = "MyCatalogDatabase"
+  name = "MyCatalogDatabase2"
 
   create_table_default_permission {
     permissions = ["SELECT"]

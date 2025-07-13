@@ -33,20 +33,6 @@ jobs:
         steps:
         - name: Checkout code
           uses: actions/checkout@v4
-
-        
-        - name: Debug - List repository contents
-          run: |
-            echo "Current working directory: $(pwd)"
-            echo "Listing contents of the root directory:"
-            ls -la
-            echo "Listing contents of 'app' directory:"
-            ls -la app
-            echo "Listing contents of 'app/src' directory:" # Também verificar src
-            ls -la app/src
-            echo "Listing contents of 'app/utils' directory:"
-            ls -la app/utils
-            echo "--- End of directory listing ---"
     
         - name: Set up Terraform
           uses: hashicorp/setup-terraform@v3
@@ -68,7 +54,7 @@ jobs:
 
         - name: Terraform Init
           run: |
-            cd infra && terraform init -upgrade \
+            cd infra && terraform init \
               -backend-config="bucket=${{ inputs.aws-statefile-s3-bucket }}" \
               -backend-config="key=${{ github.event.repository.name }}" \
               -backend-config="region=${{ inputs.aws-region }}" \
@@ -89,14 +75,10 @@ jobs:
         - name: Terraform Plan
           if: steps.read-destroy-config.outputs.destroy != 'true'
           id: terraform-plan
-          run: |
-            cd infra &&
-            TF_LOG=TRACE terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
-            terraform plan -var-file="./envs/${{ inputs.environment }}/terraform.tfvars" -out="${{ inputs.environment }}.plan"
-          env:
-            AWS_REGION: ${{ inputs.aws-region }}
-            TF_LOG: TRACE # <--- Esta linha é crucial!
-            
+          run: cd infra &&
+            terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
+            terraform plan -var-file="./envs/${{ inputs.environment }}/terraform.tfvars" -out="${{ inputs.environment  }}.plan"
+
         - name: Terraform Apply
           if: steps.read-destroy-config.outputs.destroy != 'true'
           id: terraform-apply
