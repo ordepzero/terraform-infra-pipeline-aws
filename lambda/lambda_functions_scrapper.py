@@ -129,6 +129,11 @@ def lambda_handler(event=None, context=None):
             table_columns = table_info['StorageDescriptor']['Columns']
             table_partition_keys = table_info.get('PartitionKeys', [])
 
+             # **CORREÇÃO CRÍTICA**: O StorageDescriptor da partição deve conter apenas as colunas de DADOS.
+            partition_key_names = {pk['Name'] for pk in table_partition_keys}
+            data_columns = [col for col in table_columns if col['Name'] not in partition_key_names]
+
+
             # Preparar valores das partições com base nas chaves de partição
             partition_values = []
             # Assumimos que as chaves de partição são 'year', 'month', 'day' nesta ordem
@@ -161,7 +166,7 @@ def lambda_handler(event=None, context=None):
                             'InputFormat': table_info['StorageDescriptor']['InputFormat'], # Dinâmico
                             'OutputFormat': table_info['StorageDescriptor']['OutputFormat'], # Dinâmico
                             'SerdeInfo': table_info['StorageDescriptor']['SerdeInfo'], # Dinâmico
-                            'Columns': table_columns # Usando colunas dinâmicas
+                            'Columns': data_columns # Usando colunas dinâmicas
                         }
                     }
                 )

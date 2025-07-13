@@ -90,6 +90,16 @@ resource "aws_security_group_rule" "glue_egress_all" {
   description       = "Allow all outbound traffic"
 }
 
+resource "aws_security_group_rule" "glue_egress_https" {
+  type              = "egress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.glue_job_security_group.id
+  description       = "Permitir tráfego HTTPS para endpoints AWS"
+}
+
 #################################
 #### ROUTE TABLE ASSOCIATION ####
 #################################
@@ -190,7 +200,7 @@ resource "aws_glue_job" "etl_job" {
   name              = var.glue_job_data_prep
   description       = "Glue ETL job"
   role_arn          = aws_iam_role.glue_job_role.arn
-  glue_version      = "5.0"
+  glue_version      = "4.0"
   max_retries       = 0
   timeout           = 5
   number_of_workers = 2
