@@ -477,6 +477,7 @@ module "raw_layer_tables" {
   database_name          = aws_glue_catalog_database.raw_database.name # Passa o nome do DB RAW
   s3_data_lake_bucket_name = aws_s3_bucket.bucket_bovespa_raw.bucket # Passa o nome do bucket S3
   environment            = var.environment
+  bucket_name_bovespa_bruto = var.bucket_name_bovespa_bruto
 
   depends_on = [aws_glue_catalog_database.raw_database, aws_s3_bucket.bucket_bovespa_raw]
 }
