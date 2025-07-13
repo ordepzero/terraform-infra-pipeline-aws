@@ -428,9 +428,11 @@ module "lambda_functions_scrapper" {
   create_role = false
   lambda_role    = aws_iam_role.lambda_execution_role.arn
   environment_variables = {
-    S3_BUCKET_NAME = var.bucket_name_bovespa_bruto
+    S3_BUCKET_NAME     = var.bucket_name_bovespa_bruto
+    GLUE_DATABASE_NAME = aws_glue_catalog_database.raw_database.name
+    GLUE_TABLE_NAME    = var.table_bovespa_raw
   }
-
+  
   layers = [var.lambda_layer_scrapper_artefatos_arn]
 
   tags = {
