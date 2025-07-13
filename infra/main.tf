@@ -474,10 +474,9 @@ resource "aws_glue_catalog_database" "refined_database" {
 module "raw_layer_tables" {
   source = "./modules/table/raw" # Aponta para o diretório do módulo da camada RAW
 
-  database_name          = aws_glue_catalog_database.raw_database.name # Passa o nome do DB RAW
-  s3_data_lake_bucket_name = aws_s3_bucket.bucket_bovespa_raw.bucket # Passa o nome do bucket S3
-  environment            = var.environment
-  bucket_name_bovespa_bruto = var.bucket_name_bovespa_bruto
-
+  database_name              = aws_glue_catalog_database.raw_database.name # Passa o nome do DB RAW
+  environment                = var.environment
+  bucket_name_bovespa_bruto  = var.bucket_name_bovespa_bruto
+  table_bovespa_raw          = var.table_bovespa_raw
   depends_on = [aws_glue_catalog_database.raw_database, aws_s3_bucket.bucket_bovespa_raw]
 }
