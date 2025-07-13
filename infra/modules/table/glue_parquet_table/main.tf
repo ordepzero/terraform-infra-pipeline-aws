@@ -37,8 +37,10 @@ resource "aws_glue_catalog_table" "this" {
   }
 
   parameters = {
-    "EXTERNAL" = "TRUE"
+    EXTERNAL = "TRUE"
     "parquet.compression" = "SNAPPY"
+    classification = "parquet"
+    useGlueParquetWriter = true
   }
 
   lifecycle {
