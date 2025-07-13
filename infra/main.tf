@@ -152,19 +152,6 @@ resource "aws_vpc_endpoint" "athena_interface_endpoint" {
   security_group_ids = [aws_security_group.glue_job_security_group.id]
 }
 
-# NOVO: VPC Endpoint de Interface para o serviço Glue
-# ESSENCIAL para que o job em uma VPC possa se comunicar com a API do Glue.
-resource "aws_vpc_endpoint" "glue_interface_endpoint" {
-  vpc_id            = var.vpc_id
-  service_name      = "com.amazonaws.${data.aws_region.current.region}.glue"
-  vpc_endpoint_type = "Interface"
-
-  subnet_ids         = [var.subnet_id]
-  security_group_ids = [aws_security_group.glue_job_security_group.id]
-
-  tags = { Name = "${var.environment}-glue-interface-endpoint" }
-}
-
 ###########################
 ###   GLUE CONNECTION   ###
 ###########################
@@ -216,6 +203,13 @@ resource "aws_glue_job" "etl_job" {
     "--enable-metrics"                   = ""
     "--enable-auto-scaling"              = "true"
     "--extra-py-files"                   = "s3://${aws_s3_bucket.bucket_artefatos.bucket}/utils.zip"
+    # Passando os caminhos e nomes dinamicamente para o script Python
+    "--INPUT_PATH"                       = "s3://${aws_s3_bucket.bucket_bovespa_raw.bucket}/"
+    "--OUTPUT_PATH"                      = "s3://${aws_s3_bucket.bucket_bovespa_refined.bucket}/"
+    "--DATABASE_NAME"                    = aws_glue_catalog_database.refined_database.name
+    "--TABLE_NAME"                       = "tb_fiap_tech02_bovespa_raw" # Pode ser uma variável também
+    # Bucket para salvar os resultados das queries do Athena (MSCK REPAIR)
+    "--ATHENA_OUTPUT_BUCKET"             = "s3://${aws_s3_bucket.bucket_artefatos.bucket}/athena-query-results/"
   }
 
   execution_property {
@@ -229,7 +223,7 @@ resource "aws_glue_job" "etl_job" {
 
 # IAM role for Glue jobs
 resource "aws_iam_role" "glue_job_role" {
-  name = "glue-job-role"
+  name = "${var.environment}-glue-job-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -359,7 +353,7 @@ resource "aws_lambda_function" "lambda_inicia_glue_job" {
 }
 
 resource "aws_iam_role" "lambda_execution_role" {
-  name = "lambda-execution-role"
+  name = "${var.environment}-lambda-execution-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

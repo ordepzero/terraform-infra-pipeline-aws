@@ -20,15 +20,6 @@ import sys
 
 #from modulos.catalog_glue_table import CatalogGlueTable 
 
-#######################################################################
-# Variavéis dos repositórios
-#######################################################################
-input_path = "s3://dev-533267324332-fiap-tc02-dados-brutos-bovespa/"
-output_path = "s3://prod-sa-east-1-bovespa-refined/"
-database_name = "tech_challenge"
-table_name = "tb_fiap_tech02_bovespa_raw"
-output_bucket = "s3://analistadev-athena-output/"
-
 class JobELTB3:
     def __init__(self, spark, glueContext, input_path, output_path, database_name,table_name,output_bucket,region='sa-east-1'):
         self.spark = spark
@@ -74,8 +65,18 @@ class JobELTB3:
     def update_glue_catalog(self, df):
         try:
             print("Iniciando atualização do catálogo Glue ...")
-            # A escrita dos dados já foi feita. Agora, apenas atualizamos as partições no catálogo.
-            query = f'MSCK REPAIR TABLE `{self.database_name}`.`{self.table_name}`;'
+            dynamic_frame = DynamicFrame.fromDF(df, self.glueContext, "dynamic_frame")
+                        
+            self.glueContext.write_dynamic_frame.from_catalog(
+                frame=dynamic_frame,
+                database=self.database_name,
+                table_name=self.table_name,
+                additional_options={
+                    "partitionKeys": ["ano", "mes", "dia"]
+                }
+            )
+            
+            query = f"MSCK REPAIR TABLE {self.table_name};"
             response = self.client.start_query_execution(
                 QueryString=query,
                 QueryExecutionContext={'Database': self.database_name},
@@ -139,10 +140,10 @@ class JobELTB3:
     def run(self):
         try:
             df_full_b3 = self.read_parquet_from_s3()
-            #df_full_b3 = self.adicionar_data_pregao(df_full_b3)
-            #df_full_b3 = self.transform_dataframe(df_full_b3)
-            #df_full_b3 = self.write_parquet_to_s3(df_full_b3)
-            df_full_b3.show()
+            df_full_b3 = self.adicionar_data_pregao(df_full_b3)
+            df_full_b3 = self.transform_dataframe(df_full_b3)
+            df_full_b3 = self.write_parquet_to_s3(df_full_b3)
+            
             ##### Habilitar caso tenha subido via esteira git ######
             #manager_glueTable = CatalogGlueTable(self.database_name, self.table_name, self.output_path + "acao_pregao_b3")
             #if not manager_glueTable.check_table_exists():
@@ -155,13 +156,25 @@ class JobELTB3:
             raise
 
 if __name__ == "__main__":
-    args = getResolvedOptions(sys.argv, ['JOB_NAME'])
+    # Lendo argumentos passados pelo Terraform para desacoplar o código da infraestrutura
+    args = getResolvedOptions(sys.argv, ['JOB_NAME',
+                                         'INPUT_PATH',
+                                         'OUTPUT_PATH',
+                                         'DATABASE_NAME',
+                                         'TABLE_NAME',
+                                         'ATHENA_OUTPUT_BUCKET'])
     spark = SparkSession.builder.appName("job_elt_b3").getOrCreate()
     glueContext = GlueContext(spark)
     job = Job(glueContext)
     job.init(args['JOB_NAME'], args)
 
-    job_b3 = JobELTB3(spark, glueContext, input_path, output_path, database_name, table_name,output_bucket)
+    # Instanciando a classe com os argumentos dinâmicos
+    job_b3 = JobELTB3(spark, glueContext,
+                      args['INPUT_PATH'],
+                      args['OUTPUT_PATH'],
+                      args['DATABASE_NAME'],
+                      args['TABLE_NAME'],
+                      args['ATHENA_OUTPUT_BUCKET'])
     job_b3.run()
 
     job.commit()
