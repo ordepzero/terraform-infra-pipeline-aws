@@ -87,7 +87,7 @@ def lambda_handler(event=None, context=None):
             glue_table_name = os.environ.get('GLUE_TABLE_NAME', 'tb_fiap_tech02_bovespa_raw') # Nome da sua tabela Glue
 
             # Define o caminho S3 para o arquivo Parquet
-            s3_key_prefix = f"{glue_table_name}/year={year}/month={month:02d}/day={day:02d}/"
+            s3_key_prefix = f"{glue_table_name}/ano={year}/mes={month:02d}/day={day:02d}/"
             s3_file_name = "data.parquet"
             s3_full_key = s3_key_prefix + s3_file_name
             
@@ -136,11 +136,11 @@ def lambda_handler(event=None, context=None):
             # baseada em `table_partition_keys`.
             # Exemplo mais robusto:
             for pk in table_partition_keys:
-                if pk['Name'] == 'year':
+                if pk['Name'] == 'ano':
                     partition_values.append(str(year))
-                elif pk['Name'] == 'month':
+                elif pk['Name'] == 'mes':
                     partition_values.append(f"{month:02d}")
-                elif pk['Name'] == 'day':
+                elif pk['Name'] == 'dia':
                     partition_values.append(f"{day:02d}")
                 else:
                     # Lidar com outras chaves de partição se existirem
