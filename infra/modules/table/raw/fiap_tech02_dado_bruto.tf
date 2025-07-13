@@ -17,7 +17,6 @@ module "table_bovespa_raw" {
   ]
 
   partition_keys = [
-    { name = "data_processamento", type = "date" },
     { name = "ano", type = "string" },
     { name = "mes", type = "string" },
     { name = "dia", type = "string" },
