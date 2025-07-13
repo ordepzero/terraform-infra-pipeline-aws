@@ -456,3 +456,31 @@ resource "aws_cloudwatch_event_target" "ibov_scraper_target" {
   target_id = "ibov-scraper-lambda-target"
   arn       = module.lambda_functions_scrapper.lambda_function_arn
 }
+
+
+
+
+
+####################################
+####### GLUE CATALOG DATABASE ######
+####################################
+resource "aws_glue_catalog_database" "raw_database" {
+  name       = "raw_database_name"
+  catalog_id = data.aws_caller_identity.current.account_id
+  # ...
+}
+
+resource "aws_glue_catalog_database" "refined_database" {
+  name       = "refined_database_name"
+  catalog_id = data.aws_caller_identity.current.account_id
+  # ...
+}
+module "raw_layer_tables" {
+  source = ".infra/modules/table/raw" # Aponta para o diretório do módulo da camada RAW
+
+  database_name          = aws_glue_catalog_database.raw_database.name # Passa o nome do DB RAW
+  s3_data_lake_bucket_name = aws_s3_bucket.bucket_name_bovespa_bruto.bucket # Passa o nome do bucket S3
+  environment            = var.environment
+
+  depends_on = [aws_glue_catalog_database.raw_database, aws_s3_bucket.bucket_name_bovespa_bruto]
+}
