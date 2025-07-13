@@ -20,7 +20,7 @@ resource "aws_s3_bucket" "bucket_artefatos" {
 }
 
 ##################################################
-###   ARTEFATOS PYTHON PARA O GLUE JOB       ###
+####   ARTEFATOS PYTHON PARA O GLUE JOB       ####
 ##################################################
 
 # 1. Upload do script principal do Glue Job (etl_job.py)
