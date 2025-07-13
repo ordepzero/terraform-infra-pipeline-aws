@@ -87,7 +87,7 @@ def lambda_handler(event=None, context=None):
             glue_table_name = os.environ.get('GLUE_TABLE_NAME', 'tb_fiap_tech02_bovespa_raw') # Nome da sua tabela Glue
 
             # Define o caminho S3 para o arquivo Parquet
-            s3_key_prefix = f"{glue_table_name}/ano={year}/mes={month:02d}/day={day:02d}/"
+            s3_key_prefix = f"{glue_table_name}/ano={year}/mes={month:02d}/dia={day:02d}/"
             s3_file_name = "data.parquet"
             s3_full_key = s3_key_prefix + s3_file_name
             

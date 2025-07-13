@@ -23,10 +23,10 @@ import sys
 #######################################################################
 # Variavéis dos repositórios
 #######################################################################
-input_path = "s3://prod-sa-east-1-bovespa-raw/"
+input_path = "s3://dev-533267324332-fiap-tc02-dados-brutos-bovespa/"
 output_path = "s3://prod-sa-east-1-bovespa-refined/"
 database_name = "tech_challenge"
-table_name = "b3_acao_pregao"
+table_name = "tb_fiap_tech02_bovespa_raw"
 output_bucket = "s3://analistadev-athena-output/"
 
 class JobELTB3:
@@ -74,18 +74,8 @@ class JobELTB3:
     def update_glue_catalog(self, df):
         try:
             print("Iniciando atualização do catálogo Glue ...")
-            dynamic_frame = DynamicFrame.fromDF(df, self.glueContext, "dynamic_frame")
-                        
-            self.glueContext.write_dynamic_frame.from_catalog(
-                frame=dynamic_frame,
-                database=self.database_name,
-                table_name=self.table_name,
-                additional_options={
-                    "partitionKeys": ["ano", "mes", "dia"]
-                }
-            )
-            
-            query = f"MSCK REPAIR TABLE {self.table_name};"
+            # A escrita dos dados já foi feita. Agora, apenas atualizamos as partições no catálogo.
+            query = f'MSCK REPAIR TABLE `{self.database_name}`.`{self.table_name}`;'
             response = self.client.start_query_execution(
                 QueryString=query,
                 QueryExecutionContext={'Database': self.database_name},
@@ -149,10 +139,10 @@ class JobELTB3:
     def run(self):
         try:
             df_full_b3 = self.read_parquet_from_s3()
-            df_full_b3 = self.adicionar_data_pregao(df_full_b3)
-            df_full_b3 = self.transform_dataframe(df_full_b3)
-            df_full_b3 = self.write_parquet_to_s3(df_full_b3)
-            
+            #df_full_b3 = self.adicionar_data_pregao(df_full_b3)
+            #df_full_b3 = self.transform_dataframe(df_full_b3)
+            #df_full_b3 = self.write_parquet_to_s3(df_full_b3)
+            df_full_b3.show()
             ##### Habilitar caso tenha subido via esteira git ######
             #manager_glueTable = CatalogGlueTable(self.database_name, self.table_name, self.output_path + "acao_pregao_b3")
             #if not manager_glueTable.check_table_exists():
