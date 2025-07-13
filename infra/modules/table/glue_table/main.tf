@@ -58,6 +58,4 @@ resource "aws_glue_catalog_table" "this" {
       storage_descriptor[0].columns,
     ]
   }
-
-  tags = var.tags
 }
