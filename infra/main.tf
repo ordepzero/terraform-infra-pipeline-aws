@@ -364,6 +364,16 @@ resource "aws_iam_role_policy" "lambda_policy" {
         Effect = "Allow"
         Action = "glue:StartJobRun"
         Resource = aws_glue_job.etl_job.arn
+      },
+      {
+        Effect = "Allow",
+        Action = [
+            "glue:CreatePartition",
+            "glue:GetTable",
+            "glue:GetDatabase",
+            "glue:GetPartitions"
+        ],
+        Resource = "*"
       }
     ]
   })
