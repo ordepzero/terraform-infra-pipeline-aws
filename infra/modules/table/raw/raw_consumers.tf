@@ -8,11 +8,12 @@ module "raw_customer_data" {
   s3_location   = "s3://${var.s3_data_lake_bucket_name}/raw/customers/"
 
   columns = [
-    { name = "customer_id", type = "string" },
-    { name = "name", type = "string" },
-    { name = "email", type = "string" },
-    { name = "registration_date", type = "string" },
-  ]
+    { name = "codigo_bovespa", type = "string" },
+    { name = "nome_acao", type = "string" },
+    { name = "nome_tipo_acao", type = "string" },
+    { name = "quantidade_teorica", type = "string" },
+    { name = "percentual_participacao_acao", type = "string" },
+    { name = "data_pregao", type = "date" },
 
   tags = {
     Layer       = "Raw"
