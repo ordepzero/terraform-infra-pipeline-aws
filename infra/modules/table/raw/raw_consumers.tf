@@ -16,6 +16,12 @@ module "raw_customer_data" {
     { name = "data_pregao", type = "date" }
   ]
 
+  partition_keys = [
+    { name = "data_processamento", type = "date" },
+    { name = "ano", type = "string" },
+    { name = "mes", type = "string" },
+    { name = "dia", type = "string" },
+  ]
   tags = {
     Layer       = "Raw"
     Source      = "CRM"
