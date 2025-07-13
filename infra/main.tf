@@ -97,7 +97,7 @@ resource "aws_security_group_rule" "glue_egress_https" {
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.glue_job_security_group.id
-  description       = "Permitir tráfego HTTPS para endpoints AWS"
+  description       = "Permitir trafego HTTPS para endpoints AWS"
 }
 
 #################################
