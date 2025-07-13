@@ -476,7 +476,7 @@ resource "aws_glue_catalog_database" "refined_database" {
   # ...
 }
 module "raw_layer_tables" {
-  source = "./infra/modules/table/raw" # Aponta para o diretório do módulo da camada RAW
+  source = "./modules/table/raw" # Aponta para o diretório do módulo da camada RAW
 
   database_name          = aws_glue_catalog_database.raw_database.name # Passa o nome do DB RAW
   s3_data_lake_bucket_name = aws_s3_bucket.bucket_name_bovespa_bruto.bucket # Passa o nome do bucket S3
