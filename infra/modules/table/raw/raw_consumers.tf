@@ -13,7 +13,8 @@ module "raw_customer_data" {
     { name = "nome_tipo_acao", type = "string" },
     { name = "quantidade_teorica", type = "string" },
     { name = "percentual_participacao_acao", type = "string" },
-    { name = "data_pregao", type = "date" },
+    { name = "data_pregao", type = "date" }
+  ]
 
   tags = {
     Layer       = "Raw"
