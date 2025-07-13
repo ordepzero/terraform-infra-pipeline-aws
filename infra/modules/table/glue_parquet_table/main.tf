@@ -50,7 +50,7 @@ resource "aws_glue_catalog_table" "this" {
       parameters["recordCount"],
       parameters["sizeKey"],
       parameters["compressionType"],
-      parameters["columns"],
+      # parameters["columns"],
       parameters["numRows"],
       storage_descriptor[0].columns,
     ]
