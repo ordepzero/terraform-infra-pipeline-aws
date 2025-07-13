@@ -126,6 +126,30 @@ resource "aws_vpc_endpoint" "s3_gateway_endpoint" {
   }
 }
 
+# NOVO: VPC Endpoint de Interface para CloudWatch Logs
+# Permite que o Glue Job envie logs de dentro da VPC.
+resource "aws_vpc_endpoint" "logs_interface_endpoint" {
+  vpc_id            = var.vpc_id
+  service_name      = "com.amazonaws.${data.aws_region.current.region}.logs"
+  vpc_endpoint_type = "Interface"
+
+  subnet_ids         = [var.subnet_id]
+  security_group_ids = [aws_security_group.glue_job_security_group.id]
+
+  tags = {
+    Name = "${var.environment}-logs-interface-endpoint"
+  }
+}
+
+# NOVO: VPC Endpoint de Gateway para Athena
+# Permite que o Glue Job execute queries no Athena de dentro da VPC.
+resource "aws_vpc_endpoint" "athena_gateway_endpoint" {
+  vpc_id       = var.vpc_id
+  service_name = "com.amazonaws.${data.aws_region.current.region}.athena"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids = [data.aws_route_table.glue_job_subnet_route_table.id]
+}
+
 ###########################
 ###   GLUE CONNECTION   ###
 ###########################
@@ -219,7 +243,8 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
         Effect = "Allow"
         Action = [
           "s3:GetObject",
-          "s3:PutObject",
+          "s3:PutObject", # Permissão para escrever dados
+          "s3:DeleteObject", # Necessário para o modo overwrite
           "s3:ListBucket"
         ]
         Resource = [
@@ -243,13 +268,18 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
       {
         Effect = "Allow"
         Action = [
-          "glue:GetConnection"
+          "glue:GetConnection",
+          "glue:GetDatabase",
+          "glue:GetTable",
+          "glue:UpdateTable"
         ]
         # Permissão para acessar o Glue Catalog
         # Ajuste o ARN conforme necessário para o seu Glue Catalog
         Resource = [
             "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:catalog",
-            "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:connection/*"
+            "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:connection/*",
+            "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/*",
+            "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/*"
             ]
       },
       {
@@ -267,7 +297,18 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
           "ec2:CreateTags"
         ]
         Resource = "*"
-      }]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+            "athena:StartQueryExecution",
+            "athena:GetQueryExecution"
+        ]
+        Resource = [
+            "arn:aws:athena:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workgroup/primary"
+            ]
+      }
+      ]
   })
 }
 
@@ -432,7 +473,7 @@ module "lambda_functions_scrapper" {
     GLUE_DATABASE_NAME = aws_glue_catalog_database.raw_database.name
     GLUE_TABLE_NAME    = var.table_bovespa_raw
   }
-  
+
   layers = [var.lambda_layer_scrapper_artefatos_arn]
 
   tags = {
