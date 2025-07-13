@@ -457,10 +457,6 @@ resource "aws_cloudwatch_event_target" "ibov_scraper_target" {
   arn       = module.lambda_functions_scrapper.lambda_function_arn
 }
 
-
-
-
-
 ####################################
 ####### GLUE CATALOG DATABASE ######
 ####################################
