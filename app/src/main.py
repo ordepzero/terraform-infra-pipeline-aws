@@ -49,11 +49,12 @@ class JobELTB3:
                    .withColumn("mes", month(col("data_pregao"))) \
                    .withColumn("dia", dayofmonth(col("data_pregao")))
             
+            # Escreve os dados particionados. O caminho final será output_path + table_name
             df.write\
               .mode("overwrite")\
               .option("partitionOverwriteMode", "DYNAMIC") \
               .partitionBy("ano", "mes", "dia")\
-              .parquet(self.output_path + "b3_acao_pregao")
+              .parquet(f"{self.output_path}{self.table_name}")
             
             print("Gravação dos dados realizado com sucesso.")
 
@@ -62,21 +63,14 @@ class JobELTB3:
             print(f"[write_parquet_to_s3] Erro na gravação dos dados : {e}")
             raise
 
-    def update_glue_catalog(self, df):
+    def update_glue_catalog(self):
         try:
-            print("Iniciando atualização do catálogo Glue ...")
-            dynamic_frame = DynamicFrame.fromDF(df, self.glueContext, "dynamic_frame")
-                        
-            self.glueContext.write_dynamic_frame.from_catalog(
-                frame=dynamic_frame,
-                database=self.database_name,
-                table_name=self.table_name,
-                additional_options={
-                    "partitionKeys": ["ano", "mes", "dia"]
-                }
-            )
+            print("Iniciando atualização do catálogo Glue via MSCK REPAIR...")
+            # A escrita de dados já foi feita. Agora, apenas reparamos a tabela
+            # para que o Glue descubra as novas partições escritas no S3.
+            # Usar backticks (`) é uma boa prática para nomes de tabelas e bancos de dados.
+            query = f'MSCK REPAIR TABLE `{self.database_name}`.`{self.table_name}`;'
             
-            query = f"MSCK REPAIR TABLE {self.table_name};"
             response = self.client.start_query_execution(
                 QueryString=query,
                 QueryExecutionContext={'Database': self.database_name},
@@ -91,6 +85,9 @@ class JobELTB3:
                 state = status['QueryExecution']['Status']['State']
                 if state in ['SUCCEEDED', 'FAILED', 'CANCELLED']:
                     print(f" Status da execução Athena: {state}")
+                    if state == 'FAILED':
+                        reason = status['QueryExecution']['Status'].get('StateChangeReason')
+                        print(f"Motivo da falha: {reason}")
                     break
                 time.sleep(2)
             
@@ -100,9 +97,8 @@ class JobELTB3:
             raise
 
     def adicionar_data_pregao(self,df):
-
+        # Adiciona a data do pregão baseada na data atual da execução
         df_partition = df.withColumn("data_pregao", to_date(current_date(), "yyyy-MM-dd"))
-
         return df_partition
 
 
@@ -128,28 +124,15 @@ class JobELTB3:
             print(f"Erro na etapa de tratamento do dataframe: {e}")
             raise
 
-    def grouped_df(self, df):
-        try:
-            print("Iniciando o agrupamento e contagem ...")
-            grouped_df = df.groupBy("codigo_bovespa", "nome_tipo_acao","data_pregao").count()
-            return grouped_df
-        except Exception as e:
-            print(f"Erro ao agrupar o dataframe: {e}")
-            raise
-
     def run(self):
         try:
             df_full_b3 = self.read_parquet_from_s3()
             df_full_b3 = self.adicionar_data_pregao(df_full_b3)
             df_full_b3 = self.transform_dataframe(df_full_b3)
-            df_full_b3 = self.write_parquet_to_s3(df_full_b3)
+            self.write_parquet_to_s3(df_full_b3)
             
-            ##### Habilitar caso tenha subido via esteira git ######
-            #manager_glueTable = CatalogGlueTable(self.database_name, self.table_name, self.output_path + "acao_pregao_b3")
-            #if not manager_glueTable.check_table_exists():
-            #    manager_glueTable.create_table()
-            
-            self.update_glue_catalog(df_full_b3)
+            # O método update_glue_catalog não precisa mais do dataframe
+            self.update_glue_catalog()
 
         except Exception as e:
             print(f"Erro ao executar o job: {e}")

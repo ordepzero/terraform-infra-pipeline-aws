@@ -152,6 +152,19 @@ resource "aws_vpc_endpoint" "athena_interface_endpoint" {
   security_group_ids = [aws_security_group.glue_job_security_group.id]
 }
 
+# NOVO: VPC Endpoint de Interface para o serviço Glue
+# ESSENCIAL para que o job em uma VPC possa se comunicar com a API do Glue e gerar logs.
+resource "aws_vpc_endpoint" "glue_interface_endpoint" {
+  vpc_id            = var.vpc_id
+  service_name      = "com.amazonaws.${data.aws_region.current.region}.glue"
+  vpc_endpoint_type = "Interface"
+
+  subnet_ids         = [var.subnet_id]
+  security_group_ids = [aws_security_group.glue_job_security_group.id]
+
+  tags = { Name = "${var.environment}-glue-interface-endpoint" }
+}
+
 ###########################
 ###   GLUE CONNECTION   ###
 ###########################
