@@ -230,8 +230,8 @@ resource "aws_glue_job" "etl_job" {
     "--INPUT_PATH"                       = "s3://${aws_s3_bucket.bucket_bovespa_raw.bucket}/"
     "--OUTPUT_PATH"                      = "s3://${aws_s3_bucket.bucket_bovespa_refined.bucket}/"
     "--DATABASE_NAME"                    = aws_glue_catalog_database.refined_database.name
-    "--TABLE_NAME"                       = "tb_fiap_tech02_bovespa_raw" # Pode ser uma variável também
-    # Bucket para salvar os resultados das queries do Athena (MSCK REPAIR)
+    "--TABLE_NAME"                       = var.table_bovespa_raw
+    "--OUTPUT_TABLE_NAME"                = var.table_bovespa_refined
     "--ATHENA_OUTPUT_BUCKET"             = "s3://${aws_s3_bucket.bucket_artefatos.bucket}/athena-query-results/"
   }
 

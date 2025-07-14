@@ -11,7 +11,7 @@ from awsglue.transforms import *
 from awsglue.dynamicframe import DynamicFrame
 from awsglue.utils import getResolvedOptions
 from awsglue.job import Job
-from pyspark.sql.functions import year, month, dayofmonth,to_date,regexp_replace,col,current_date
+from pyspark.sql.functions import year, month, dayofmonth,to_date,regexp_replace,col,current_date, lpad
 import boto3
 import time
 import sys
@@ -21,13 +21,14 @@ import sys
 #from modulos.catalog_glue_table import CatalogGlueTable 
 
 class JobELTB3:
-    def __init__(self, spark, glueContext, input_path, output_path, database_name,table_name,output_bucket,region='sa-east-1'):
+    def __init__(self, spark, glueContext, input_path, output_path, database_name,table_name, output_table_name,output_bucket,region='sa-east-1'):
         self.spark = spark
         self.glueContext = glueContext
         self.input_path = input_path
         self.output_path = output_path
         self.database_name = database_name
         self.table_name = table_name
+        self.output_table_name = output_table_name
         self.output_bucket =output_bucket
         self.region=region
         self.client = boto3.client('athena', region_name=self.region)
@@ -45,16 +46,11 @@ class JobELTB3:
 
     def write_parquet_to_s3(self, df):
         try:
-            df = df.withColumn("ano", year(col("data_pregao"))) \
-                   .withColumn("mes", month(col("data_pregao"))) \
-                   .withColumn("dia", dayofmonth(col("data_pregao")))
-            
-            # Escreve os dados particionados. O caminho final será output_path + table_name
             df.write\
               .mode("overwrite")\
               .option("partitionOverwriteMode", "DYNAMIC") \
               .partitionBy("ano", "mes", "dia")\
-              .parquet(f"{self.output_path}{self.table_name}")
+              .parquet(f"{self.output_path}{self.output_table_name}")
             
             print("Gravação dos dados realizado com sucesso.")
 
@@ -105,25 +101,27 @@ class JobELTB3:
     def transform_dataframe(self, df):
         try:
             print("Iniciando tratamento rename columns ...")
-            df = df.withColumnRenamed("segment", "segmento") \
-                   .withColumnRenamed("cod", "codigo_bovespa") \
-                   .withColumnRenamed("asset", "nome_acao") \
-                   .withColumnRenamed("type", "nome_tipo_acao") \
-                   .withColumnRenamed("part", "percentual_participacao_acao") \
-                   .withColumnRenamed("partacum", "percentual_participacao_acumulada") \
-                   .withColumnRenamed("theoricalqty", "quantidade_teorica")
-            
-
-            print("types columns ...")
-            df = df.withColumn("segmento", df["segmento"].cast("string")) \
-                   .withColumn("codigo_bovespa", df["codigo_bovespa"].cast("string")) \
-                   .withColumn("nome_acao", df["nome_acao"].cast("string")) \
-                   .withColumn("nome_tipo_acao", df["nome_tipo_acao"].cast("string")) \
-                   .withColumn("quantidade_teorica", df["quantidade_teorica"].cast("decimal(18,0)")) \
-                   .withColumn("percentual_participacao_acumulada", regexp_replace(col("percentual_participacao_acumulada"), ".", "").cast("decimal(18,3)")) \
-                   .withColumn("percentual_participacao_acao",regexp_replace(col("percentual_participacao_acao"), ",", ".").cast("decimal(3,3)"))
-                   
-            return df
+            df_renamed = df.withColumnRenamed("segment", "segmento") \
+                           .withColumnRenamed("cod", "codigo_bovespa") \
+                           .withColumnRenamed("asset", "nome_acao") \
+                           .withColumnRenamed("type", "nome_tipo_acao") \
+                           .withColumnRenamed("part", "percentual_participacao_acao") \
+                           .withColumnRenamed("partacum", "percentual_participacao_acumulada") \
+                           .withColumnRenamed("theoricalqty", "quantidade_teorica")
+    
+            print("Iniciando conversão de tipos e limpeza...")
+            df_transformed = df_renamed \
+                .withColumn("quantidade_teorica", regexp_replace(col("quantidade_teorica"), "\\.", "").cast("decimal(18,0)")) \
+                .withColumn("percentual_participacao_acumulada", regexp_replace(col("percentual_participacao_acumulada"), ",", ".").cast("decimal(18,3)")) \
+                .withColumn("percentual_participacao_acao", regexp_replace(col("percentual_participacao_acao"), ",", ".").cast("decimal(18,3)")) \
+                .withColumn("ano", col("ano").cast("string")) \
+                .withColumn("mes", lpad(col("mes").cast("string"), 2, '0')) \
+                .withColumn("dia", lpad(col("dia").cast("string"), 2, '0'))
+    
+            # As colunas de string não precisam de cast explícito se já foram lidas como string.
+            # Ex: .withColumn("segmento", col("segmento").cast("string"))
+    
+            return df_transformed
         except Exception as e:
             print(f"Erro na etapa de tratamento do dataframe: {e}")
             raise
@@ -131,12 +129,12 @@ class JobELTB3:
     def run(self):
         try:
             df_full_b3 = self.read_parquet_from_s3()
-            #df_full_b3 = self.adicionar_data_pregao(df_full_b3)
-            #df_full_b3 = self.transform_dataframe(df_full_b3)
-            #self.write_parquet_to_s3(df_full_b3)
+            df_full_b3 = self.adicionar_data_pregao(df_full_b3)
+            df_full_b3 = self.transform_dataframe(df_full_b3)
+            self.write_parquet_to_s3(df_full_b3)
             df_full_b3.show()
             # O método update_glue_catalog não precisa mais do dataframe
-            self.update_glue_catalog()
+            #self.update_glue_catalog()
 
         except Exception as e:
             print(f"Erro ao executar o job: {e}")
@@ -149,6 +147,7 @@ if __name__ == "__main__":
                                          'OUTPUT_PATH',
                                          'DATABASE_NAME',
                                          'TABLE_NAME',
+                                         'OUTPUT_TABLE_NAME',
                                          'ATHENA_OUTPUT_BUCKET'])
     spark = SparkSession.builder.appName("job_elt_b3").getOrCreate()
     glueContext = GlueContext(spark)
@@ -163,6 +162,7 @@ if __name__ == "__main__":
                       args['OUTPUT_PATH'],
                       args['DATABASE_NAME'],
                       args['TABLE_NAME'],
+                      args['OUTPUT_TABLE_NAME'],
                       args['ATHENA_OUTPUT_BUCKET'])
     job_b3.run()
 

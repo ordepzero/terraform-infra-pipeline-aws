@@ -24,7 +24,7 @@ module "table_bovespa_raw" {
   ]
   tags = {
     Layer       = "Raw"
-    Source      = "CRM"
+    Source      = "Bovespa"
     Environment = var.environment
   }
 }

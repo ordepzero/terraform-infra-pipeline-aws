@@ -17,6 +17,11 @@ variable "table_bovespa_raw" {
   type        = string
 }
 
+variable "table_bovespa_refined" {
+  description = "O nome da tabela Glue para os dados refinados da Bovespa."
+  type        = string
+}
+
 variable "bucket_name_artefatos" {
   description = "The name of the S3 bucket armazenar os scripts."
   type        = string
