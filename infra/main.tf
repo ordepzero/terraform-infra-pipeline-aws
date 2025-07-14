@@ -577,3 +577,17 @@ module "raw_layer_tables" {
   
   depends_on = [aws_glue_catalog_database.raw_database, aws_s3_bucket.bucket_bovespa_raw]
 }
+
+
+module "refined_layer_tables" {
+  source = "./modules/table/refined" # Aponta para o diretório do módulo da camada RAW
+
+  database_name              = aws_glue_catalog_database.refined_database.name # Passa o nome do DB RAW
+  environment                = var.environment
+  bucket_name_bovespa_bruto  = var.bucket_name_bovespa_refinado
+  table_bovespa_raw          = var.table_bovespa_refined
+  
+  depends_on = [aws_glue_catalog_database.refined_database, aws_s3_bucket.bucket_bovespa_refined]
+}
+
+
