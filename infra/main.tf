@@ -344,7 +344,10 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
         Effect = "Allow",
         Action = [
           "cloudwatch:PutMetricData",
-          "logs:CreateLogGroup"
+          "logs:CreateLogGroup",
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
         ],
         # A permissão para métricas não é vinculada a um recurso específico
         Resource = "*"
@@ -352,7 +355,6 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
       ]
   })
 }
-
 
 #############################################
 #####   LAMBDA INICIALIZA O GLUE JOB   ######

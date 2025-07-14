@@ -155,6 +155,8 @@ if __name__ == "__main__":
     job = Job(glueContext)
     job.init(args['JOB_NAME'], args)
 
+    print("Glue Job iniciado com sucesso")
+
     # Instanciando a classe com os argumentos dinâmicos
     job_b3 = JobELTB3(spark, glueContext,
                       args['INPUT_PATH'],
