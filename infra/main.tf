@@ -303,7 +303,8 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
           "glue:GetConnection",
           "glue:GetDatabase",
           "glue:GetTable",
-          "glue:UpdateTable"
+          "glue:UpdateTable",
+          "glue:BatchCreatePartition"
         ]
         # Permissão para acessar o Glue Catalog
         # Ajuste o ARN conforme necessário para o seu Glue Catalog
