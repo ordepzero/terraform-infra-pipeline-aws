@@ -12,6 +12,16 @@ variable "bucket_name_bovespa_refinado" {
   type        = string
 }
 
+variable "database_bovespa_raw" {
+  description = "O nome do banco de dados Glue para os dados brutos da Bovespa."
+  type        = string
+}
+
+variable "database_bovespa_refined" {
+  description = "O nome do banco de dados Glue para os dados refinados da Bovespa."
+  type        = string
+}
+
 variable "table_bovespa_raw" {
   description = "O nome da tabela Glue para os dados brutos da Bovespa."
   type        = string

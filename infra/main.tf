@@ -557,13 +557,13 @@ resource "aws_cloudwatch_event_target" "ibov_scraper_target" {
 ####### GLUE CATALOG DATABASE ######
 ####################################
 resource "aws_glue_catalog_database" "raw_database" {
-  name       = "raw_database_name"
+  name       = var.database_bovespa_raw
   catalog_id = data.aws_caller_identity.current.account_id
   # ...
 }
 
 resource "aws_glue_catalog_database" "refined_database" {
-  name       = "refined_database_name"
+  name       = var.database_bovespa_refined
   catalog_id = data.aws_caller_identity.current.account_id
   # ...
 }
