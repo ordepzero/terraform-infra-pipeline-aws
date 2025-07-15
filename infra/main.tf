@@ -580,7 +580,7 @@ module "raw_layer_tables" {
 
 
 module "refined_layer_tables" {
-  source = "./modules/table/refined" # Aponta para o diretório do módulo da camada RAW
+  source = "./modules/table/refined" 
 
   database_name              = aws_glue_catalog_database.refined_database.name # Passa o nome do DB RAW
   environment                = var.environment

@@ -1,11 +1,11 @@
 # modules/raw_layer/raw_customers.tf
 
-module "table_bovespa_refinado" {
+module "table_bovespa_refined" {
   source = "../glue_parquet_table" # Caminho relativo para o módulo glue_table
 
-  table_name    = var.table_bovespa_refinado
+  table_name    = var.table_bovespa_refined
   database_name = var.database_name
-  s3_location   = "s3://${var.bucket_name_bovespa_refinado}/${var.table_bovespa_refinado}"
+  s3_location   = "s3://${var.bucket_name_bovespa_refinado}/${var.table_bovespa_refined}"
 
   columns = [
     { name = "segmento", type = "string" },

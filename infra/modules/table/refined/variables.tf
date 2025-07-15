@@ -3,7 +3,7 @@ variable "database_name" {
   type        = string
 }
 
-variable "table_bovespa_refinado" {
+variable "table_bovespa_refined" {
   description = "O nome da tabela Glue para os dados refinado da Bovespa."
   type        = string
 }
