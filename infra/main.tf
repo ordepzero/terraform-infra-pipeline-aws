@@ -361,6 +361,7 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
   })
 }
 
+
 #############################################
 #####   LAMBDA INICIALIZA O GLUE JOB   ######
 #############################################
@@ -460,7 +461,8 @@ resource "aws_iam_role_policy" "lambda_policy" {
             "glue:CreatePartition",
             "glue:GetTable",
             "glue:GetDatabase",
-            "glue:GetPartitions"
+            "glue:GetPartitions",
+            "glue:CreateDatabase"
         ],
         Resource = "*"
       }
