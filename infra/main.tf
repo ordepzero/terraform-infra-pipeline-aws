@@ -337,6 +337,7 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
       {
         Effect = "Allow"
         Action = [
+          "glue:CreateTable",
           "glue:GetConnection",
           "glue:GetDatabase",
           "glue:GetTable",
