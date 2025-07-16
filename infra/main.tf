@@ -66,19 +66,7 @@ resource "aws_security_group" "glue_job_security_group" {
   }
 }
 
-# NOVO: Security Group para os VPC Endpoints de Interface
-resource "aws_security_group" "vpc_endpoints_sg" {
-  name        = "${var.environment}-vpc-endpoints-sg"
-  description = "Security group for VPC Interface Endpoints"
-  vpc_id      = var.vpc_id
 
-  tags = {
-    Name = "${var.environment}-vpc-endpoints-sg"
-  }
-}
-
-# Regra de ENTRADA para o SG dos Endpoints: Permite tráfego HTTPS vindo do SG do Glue Job.
-# Esta é a regra CRÍTICA que resolve o erro de "connect timed out".
 resource "aws_security_group_rule" "endpoints_ingress_from_glue_job" {
   type                     = "ingress"
   from_port                = 443
@@ -90,14 +78,7 @@ resource "aws_security_group_rule" "endpoints_ingress_from_glue_job" {
 }
 
 # Regra de SAÍDA para o SG do Glue Job: Permite tráfego HTTPS para o SG dos Endpoints.
-resource "aws_security_group_rule" "glue_job_egress_to_endpoints" {
-  type              = "egress"
-  from_port         = 443
-  to_port           = 443
-  protocol          = "tcp"
-  security_group_id = aws_security_group.vpc_endpoints_sg.id 
-  description       = "Allow HTTPS to VPC Endpoints"
-}
+
 
 
 
@@ -122,24 +103,12 @@ resource "aws_security_group" "vpc_endpoints_sg" {
   }
 }
 
-# Ingress rule on VPC Endpoints SG: Allow HTTPS from Glue Job SG
-resource "aws_security_group_rule" "endpoints_ingress_from_glue_job" {
-  type                     = "ingress"
-  from_port                = 443
-  to_port                  = 443
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.vpc_endpoints_sg.id
-  source_security_group_id = aws_security_group.glue_job_security_group.id
-  description              = "Allow HTTPS from Glue Job"
-}
-
-# Egress rule on Glue Job SG: Allow HTTPS to VPC Endpoints SG
 resource "aws_security_group_rule" "glue_job_egress_to_endpoints" {
   type              = "egress"
   from_port         = 443
   to_port           = 443
   protocol          = "tcp"
-  security_group_id = aws_security_group.glue_job_security_group.id
+  security_group_id = aws_security_group.vpc_endpoints_sg.id 
   description       = "Allow HTTPS to VPC Endpoints"
 }
 
