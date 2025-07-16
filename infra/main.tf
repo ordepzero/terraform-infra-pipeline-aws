@@ -96,9 +96,10 @@ resource "aws_security_group_rule" "glue_job_egress_to_endpoints" {
   to_port           = 443
   protocol          = "tcp"
   security_group_id = aws_security_group.glue_job_security_group.id
-  security_group_id = aws_security_group.vpc_endpoints_sg.id
+  #destination_security_group_id = aws_security_group.vpc_endpoints_sg.id
   description       = "Allow HTTPS to VPC Endpoints"
 }
+
 
 # Regra de SAÍDA para o SG do Glue Job: Permite DNS. Necessário para resolver nomes de endpoints.
 resource "aws_security_group_rule" "glue_job_egress_dns" {
