@@ -66,38 +66,49 @@ resource "aws_security_group" "glue_job_security_group" {
   }
 }
 
-# Regra de Security Group para permitir todo o tráfego de entrada do próprio SG
-# Isso é necessário para a comunicação interna dos componentes do Glue Job na VPC.
-resource "aws_security_group_rule" "glue_self_ingress_all" {
-  type              = "ingress"
-  from_port         = 0
-  to_port           = 65535
-  protocol          = -1 # -1 significa todos os protocolos
-  security_group_id = aws_security_group.glue_job_security_group.id
-  self              = true # Permite tráfego de e para o próprio Security Group
-  description       = "Required for AWS Glue internal communication within VPC"
+# NOVO: Security Group para os VPC Endpoints de Interface
+resource "aws_security_group" "vpc_endpoints_sg" {
+  name        = "${var.environment}-vpc-endpoints-sg"
+  description = "Security group for VPC Interface Endpoints"
+  vpc_id      = var.vpc_id
+
+  tags = {
+    Name = "${var.environment}-vpc-endpoints-sg"
+  }
 }
 
-# Regra de Security Group para permitir todo o tráfego de saída
-# Isso é comum para Glue Jobs, permitindo acesso a S3, CloudWatch, etc.
-resource "aws_security_group_rule" "glue_egress_all" {
-  type              = "egress"
-  from_port         = 0
-  to_port           = 0
-  protocol          = "-1" # -1 significa todos os protocolos
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.glue_job_security_group.id
-  description       = "Allow all outbound traffic"
+# Regra de ENTRADA para o SG dos Endpoints: Permite tráfego HTTPS vindo do SG do Glue Job.
+# Esta é a regra CRÍTICA que resolve o erro de "connect timed out".
+resource "aws_security_group_rule" "endpoints_ingress_from_glue_job" {
+  type                     = "ingress"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.vpc_endpoints_sg.id
+  source_security_group_id = aws_security_group.glue_job_security_group.id
+  description              = "Allow HTTPS from Glue Job"
 }
 
-resource "aws_security_group_rule" "glue_egress_https" {
+# Regra de SAÍDA para o SG do Glue Job: Permite tráfego HTTPS para o SG dos Endpoints.
+resource "aws_security_group_rule" "glue_job_egress_to_endpoints" {
   type              = "egress"
   from_port         = 443
   to_port           = 443
   protocol          = "tcp"
-  cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.glue_job_security_group.id
-  description       = "Permitir trafego HTTPS para endpoints AWS"
+  destination_security_group_id = aws_security_group.vpc_endpoints_sg.id
+  description       = "Allow HTTPS to VPC Endpoints"
+}
+
+# Regra de SAÍDA para o SG do Glue Job: Permite DNS. Necessário para resolver nomes de endpoints.
+resource "aws_security_group_rule" "glue_job_egress_dns" {
+  type              = "egress"
+  from_port         = 53
+  to_port           = 53
+  protocol          = "udp"
+  cidr_blocks       = [data.aws_vpc.default.cidr_block] # Ou o CIDR da sua VPC
+  security_group_id = aws_security_group.glue_job_security_group.id
+  description       = "Allow DNS resolution within the VPC"
 }
 
 #################################
@@ -105,20 +116,11 @@ resource "aws_security_group_rule" "glue_egress_https" {
 #################################
 
 data "aws_subnet" "glue_job_subnet" {
-  id = var.subnet_id # O ID da sub-rede do seu Glue Job
+  id = var.subnet_id
 }
 
-
-# Data source para obter a tabela de rotas da sub-rede do Glue Job
-# Isso é necessário para associar o VPC Endpoint S3 à tabela de rotas correta.
 data "aws_route_table" "glue_job_subnet_route_table" {
-  vpc_id = data.aws_subnet.glue_job_subnet.vpc_id
-
-  # Removendo o filtro "association.subnet-id" para focar na "main".
-  filter {
-    name   = "association.main"
-    values = ["true"]
-  }
+  subnet_id = data.aws_subnet.glue_job_subnet.id
 }
 
 # NOVO: VPC Endpoint de Gateway para S3
@@ -142,9 +144,10 @@ resource "aws_vpc_endpoint" "logs_interface_endpoint" {
   vpc_id            = var.vpc_id
   service_name      = "com.amazonaws.${data.aws_region.current.region}.logs"
   vpc_endpoint_type = "Interface"
+  private_dns_enabled = true
 
   subnet_ids         = [var.subnet_id]
-  security_group_ids = [aws_security_group.glue_job_security_group.id]
+  security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
 
   tags = {
     Name = "${var.environment}-logs-interface-endpoint"
@@ -157,9 +160,10 @@ resource "aws_vpc_endpoint" "athena_interface_endpoint" {
   vpc_id            = var.vpc_id
   service_name      = "com.amazonaws.${data.aws_region.current.region}.athena"
   vpc_endpoint_type = "Interface"
+  private_dns_enabled = true
 
   subnet_ids         = [var.subnet_id]
-  security_group_ids = [aws_security_group.glue_job_security_group.id]
+  security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
 }
 
 # NOVO: VPC Endpoint de Interface para o serviço Glue
@@ -168,9 +172,10 @@ resource "aws_vpc_endpoint" "glue_interface_endpoint" {
   vpc_id            = var.vpc_id
   service_name      = "com.amazonaws.${data.aws_region.current.region}.glue"
   vpc_endpoint_type = "Interface"
+  private_dns_enabled = true
 
   subnet_ids         = [var.subnet_id]
-  security_group_ids = [aws_security_group.glue_job_security_group.id]
+  security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
 
   tags = { Name = "${var.environment}-glue-interface-endpoint" }
 }
@@ -188,6 +193,11 @@ resource "aws_glue_connection" "glue_connection" {
     security_group_id_list = [aws_security_group.glue_job_security_group.id] 
     subnet_id = var.subnet_id
   }
+}
+
+# Data source para obter a VPC
+data "aws_vpc" "default" {
+  id = var.vpc_id
 }
 
 
@@ -596,5 +606,3 @@ module "refined_layer_tables" {
   
   depends_on = [aws_glue_catalog_database.refined_database, aws_s3_bucket.bucket_bovespa_refined]
 }
-
-
