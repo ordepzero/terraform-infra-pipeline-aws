@@ -96,7 +96,7 @@ resource "aws_security_group_rule" "glue_job_egress_to_endpoints" {
   to_port           = 443
   protocol          = "tcp"
   security_group_id = aws_security_group.glue_job_security_group.id
-  destination_security_group_id = aws_security_group.vpc_endpoints_sg.id
+  security_group_id = aws_security_group.vpc_endpoints_sg.id
   description       = "Allow HTTPS to VPC Endpoints"
 }
 
