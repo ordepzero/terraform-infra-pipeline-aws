@@ -348,7 +348,11 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
           "logs:CreateLogGroup",
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
-          "logs:PutLogEvents"
+          "logs:PutLogEvents",
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:ListBucket",
+          "s3:DeleteObject"
         ],
         # A permissão para métricas não é vinculada a um recurso específico
         Resource = "*"
