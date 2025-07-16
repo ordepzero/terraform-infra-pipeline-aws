@@ -120,8 +120,16 @@ data "aws_subnet" "glue_job_subnet" {
   id = var.subnet_id
 }
 
+# Data source para obter a tabela de rotas da sub-rede do Glue Job
+# Isso é necessário para associar o VPC Endpoint S3 à tabela de rotas correta.
 data "aws_route_table" "glue_job_subnet_route_table" {
-  subnet_id = data.aws_subnet.glue_job_subnet.id
+  vpc_id = data.aws_subnet.glue_job_subnet.vpc_id
+
+  # Removendo o filtro "association.subnet-id" para focar na "main".
+  filter {
+    name   = "association.main"
+    values = ["true"]
+  }
 }
 
 # NOVO: VPC Endpoint de Gateway para S3
