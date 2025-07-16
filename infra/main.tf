@@ -66,6 +66,17 @@ resource "aws_security_group" "glue_job_security_group" {
   }
 }
 
+# Regra de Security Group para permitir todo o tráfego de entrada do próprio SG
+# Isso é necessário para a comunicação interna dos componentes do Glue Job na VPC.
+resource "aws_security_group_rule" "glue_self_ingress_all" {
+  type              = "ingress"
+  from_port         = 0
+  to_port           = 65535
+  protocol          = -1 # -1 significa todos os protocolos
+  security_group_id = aws_security_group.glue_job_security_group.id
+  self              = true # Permite tráfego de e para o próprio Security Group
+  description       = "Required for AWS Glue internal communication within VPC"
+}
 
 resource "aws_security_group_rule" "endpoints_ingress_from_glue_job" {
   type                     = "ingress"
@@ -76,10 +87,6 @@ resource "aws_security_group_rule" "endpoints_ingress_from_glue_job" {
   source_security_group_id = aws_security_group.glue_job_security_group.id
   description              = "Allow HTTPS from Glue Job"
 }
-
-# Regra de SAÍDA para o SG do Glue Job: Permite tráfego HTTPS para o SG dos Endpoints.
-
-
 
 
 # Regra de SAÍDA para o SG do Glue Job: Permite DNS. Necessário para resolver nomes de endpoints.
@@ -92,6 +99,19 @@ resource "aws_security_group_rule" "glue_job_egress_dns" {
   security_group_id = aws_security_group.glue_job_security_group.id
   description       = "Allow DNS resolution within the VPC"
 }
+
+# Regra de Security Group para permitir todo o tráfego de saída
+# Isso é comum para Glue Jobs, permitindo acesso a S3, CloudWatch, etc.
+resource "aws_security_group_rule" "glue_egress_all" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1" # -1 significa todos os protocolos
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.glue_job_security_group.id
+  description       = "Allow all outbound traffic"
+}
+
 
 resource "aws_security_group" "vpc_endpoints_sg" {
   name        = "${var.environment}-vpc-endpoints-sg"
