@@ -3,6 +3,7 @@
 resource "aws_glue_catalog_table" "this" {
   name          = var.table_name
   database_name = var.database_name
+  table_type    = "EXTERNAL_TABLE"
 
   storage_descriptor {
     location      = var.s3_location
@@ -43,16 +44,16 @@ resource "aws_glue_catalog_table" "this" {
     useGlueParquetWriter = true
   }
 
-  lifecycle {
-    ignore_changes = [
-      parameters["CrawlerSchemaDeserializerVersion"], # Ignorar mudanças de crawlers
-      parameters["averageRecordSize"],
-      parameters["recordCount"],
-      parameters["sizeKey"],
-      parameters["compressionType"],
-      # parameters["columns"],
-      parameters["numRows"],
-      # storage_descriptor[0].columns,
-    ]
-  }
+  #lifecycle {
+  #  ignore_changes = [
+  #    parameters["CrawlerSchemaDeserializerVersion"], # Ignorar mudanças de crawlers
+  #    parameters["averageRecordSize"],
+  #    parameters["recordCount"],
+  #    parameters["sizeKey"],
+  #    parameters["compressionType"],
+  #    # parameters["columns"],
+  #    parameters["numRows"],
+  #    # storage_descriptor[0].columns,
+  #  ]
+  #}
 }
