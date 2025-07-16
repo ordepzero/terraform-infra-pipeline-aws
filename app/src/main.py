@@ -59,38 +59,27 @@ class JobELTB3:
             print(f"[write_parquet_to_s3] Erro na gravação dos dados : {e}")
             raise
 
-    def update_glue_catalog(self):
-        try:
-            print("Iniciando atualização do catálogo Glue via MSCK REPAIR...")
-            # A escrita de dados já foi feita. Agora, apenas reparamos a tabela
-            # para que o Glue descubra as novas partições escritas no S3.
-            # Usar backticks (`) é uma boa prática para nomes de tabelas e bancos de dados.
-            query = f'MSCK REPAIR TABLE `{self.database_name}`.`{self.table_name}`;'
-            
-            response = self.client.start_query_execution(
-                QueryString=query,
-                QueryExecutionContext={'Database': self.database_name},
-                ResultConfiguration={'OutputLocation': self.output_bucket}
-            )
-    
-            execution_id = response['QueryExecutionId']
-            print(f"Executando MSCK REPAIR TABLE... ID da execução: {execution_id}")
-            
-            while True:
-                status = self.client.get_query_execution(QueryExecutionId=execution_id)
-                state = status['QueryExecution']['Status']['State']
-                if state in ['SUCCEEDED', 'FAILED', 'CANCELLED']:
-                    print(f" Status da execução Athena: {state}")
-                    if state == 'FAILED':
-                        reason = status['QueryExecution']['Status'].get('StateChangeReason')
-                        print(f"Motivo da falha: {reason}")
-                    break
-                time.sleep(2)
-            
-            print("Catálogo atualizado com sucesso.")
-        except Exception as e:
-            print(f"[update_glue_catalog] Erro ao atualizar/criar o catálogo: {e}")
-            raise
+    def update_glue_catalog(self, df):
+      try:
+          spark = self.glueContext.spark_session
+          spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
+
+          print(f"Constructed output path for saveAsTable: {self.output_path}")  # Debugging
+          print(f"Database: {self.database_name}, Table: {self.output_table_name}")  # Debugging
+          print(f"Initiating dynamic partition overwrite for table '{self.database_name}.{self.output_table_name}'...")
+
+          df.write \
+          .mode("overwrite") \
+          .format("parquet") \
+          .partitionBy("ano", "mes", "dia", "data_pregao") \
+          .option("path", self.output_path) \
+          .saveAsTable(f"{self.database_name}.{self.output_table_name}") 
+          print(f"Data saved to '{self.output_path}' and catalog '{self.database_name}.{self.output_table_name}' updated successfully.")
+
+      except Exception as e:
+          print(f"[update_glue_catalog] Error overwriting data and updating catalog: {e}")
+          raise
+
 
     def adicionar_data_pregao(self,df):
         # Adiciona a data do pregão baseada na data atual da execução
@@ -131,10 +120,10 @@ class JobELTB3:
             df_full_b3 = self.read_parquet_from_s3()
             df_full_b3 = self.adicionar_data_pregao(df_full_b3)
             df_full_b3 = self.transform_dataframe(df_full_b3)
-            self.write_parquet_to_s3(df_full_b3)
+            #self.write_parquet_to_s3(df_full_b3)
             df_full_b3.show()
             # O método update_glue_catalog não precisa mais do dataframe
-            #self.update_glue_catalog()
+            self.update_glue_catalog(df_full_b3)
 
         except Exception as e:
             print(f"Erro ao executar o job: {e}")
