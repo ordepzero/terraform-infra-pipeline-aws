@@ -262,6 +262,7 @@ resource "aws_glue_job" "etl_job" {
     "--enable-continuous-log-filter"     = "true"
     "--enable-metrics"                   = ""
     "--enable-auto-scaling"              = "true"
+    "--enable-glue-datacatalog"          = "true"
     "--extra-py-files"                   = "s3://${aws_s3_bucket.bucket_artefatos.bucket}/utils.zip"
     # Passando os caminhos e nomes dinamicamente para o script Python
     "--INPUT_PATH"                       = "s3://${aws_s3_bucket.bucket_bovespa_raw.bucket}/"
