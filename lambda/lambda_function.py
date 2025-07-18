@@ -1,6 +1,7 @@
 import json
 import boto3
 import os
+import urllib.parse
 
 glue = boto3.client('glue')
 
@@ -10,22 +11,29 @@ def lambda_handler(event, context):
     # Extract bucket and object key from the S3 event
     for record in event.get('Records', []):
         s3_info = record.get('s3', {})
-        bucket = s3_info.get('bucket', {}).get('name')
-        key = s3_info.get('object', {}).get('key')
+        bucket_name = s3_info.get('bucket', {}).get('name')
+        encoded_key = s3_info.get('object', {}).get('key')
         
-        # Optional: Add logic to filter specific files or buckets
-        if bucket and key:
+        if not bucket_name or not encoded_key:
+            print("Bucket ou chave não encontrados no registro do evento. Pulando.")
+            continue
+
+        # Decodifica a chave do objeto S3 (ex: converte %3D para =)
+        object_key = urllib.parse.unquote_plus(encoded_key)
+        
+        # Constrói o caminho completo do S3 para o arquivo que acionou o evento
+        s3_source_path = f"s3://{bucket_name}/{object_key}"
+
+        try:
             # Start Glue job
             response = glue.start_job_run(
-                JobName=glue_job_name,  # Replace with your Glue job name
-                Arguments={
-                    '--bucket': bucket,
-                    '--key': key
-                }
+                JobName=glue_job_name,
+                Arguments={'--INPUT_PATH': s3_source_path} # Sobrescreve o argumento padrão com o caminho do arquivo específico
             )
-            print(f"Started Glue job: {response['JobRunId']} for {bucket}/{key}")
-        else:
-            print("Bucket or key not found in event record.")
+            print(f"Job do Glue iniciado: {response['JobRunId']} para o arquivo: {s3_source_path}")
+        except Exception as e:
+            print(f"Erro ao iniciar o job do Glue: {e}")
+            raise e
 
     return {
         'statusCode': 200,
