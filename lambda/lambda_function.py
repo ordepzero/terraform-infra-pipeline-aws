@@ -21,16 +21,20 @@ def lambda_handler(event, context):
         # Decodifica a chave do objeto S3 (ex: converte %3D para =)
         object_key = urllib.parse.unquote_plus(encoded_key)
         
-        # Constrói o caminho completo do S3 para o arquivo que acionou o evento
-        s3_source_path = f"s3://{bucket_name}/{object_key}"
+        # OBTÉM O DIRETÓRIO DA PARTIÇÃO, NÃO O CAMINHO DO ARQUIVO.
+        # Isso permite que o Spark infira as colunas de partição (ano, mes, dia) da estrutura de pastas.
+        partition_directory = os.path.dirname(object_key)
+        
+        # Constrói o caminho completo do S3 para o DIRETÓRIO da partição
+        s3_source_path = f"s3://{bucket_name}/{partition_directory}/"
 
         try:
             # Start Glue job
             response = glue.start_job_run(
                 JobName=glue_job_name,
-                Arguments={'--INPUT_PATH': s3_source_path} # Sobrescreve o argumento padrão com o caminho do arquivo específico
+                Arguments={'--INPUT_PATH': s3_source_path} # Sobrescreve o argumento padrão com o caminho do DIRETÓRIO da partição
             )
-            print(f"Job do Glue iniciado: {response['JobRunId']} para o arquivo: {s3_source_path}")
+            print(f"Job do Glue iniciado: {response['JobRunId']} para a partição: {s3_source_path}")
         except Exception as e:
             print(f"Erro ao iniciar o job do Glue: {e}")
             raise e
