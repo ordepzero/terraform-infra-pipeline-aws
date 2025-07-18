@@ -11,7 +11,8 @@ from awsglue.transforms import *
 from awsglue.dynamicframe import DynamicFrame
 from awsglue.utils import getResolvedOptions
 from awsglue.job import Job
-from pyspark.sql.functions import year, month, dayofmonth,to_date,regexp_replace,col,current_date, lpad
+from pyspark.sql.functions import year, month, dayofmonth,to_date,regexp_replace,col,current_date, lpad, lit
+import re
 import boto3
 import time
 import sys
@@ -32,16 +33,37 @@ class JobELTB3:
         self.output_bucket =output_bucket
         self.region=region
         self.client = boto3.client('athena', region_name=self.region)
-        
+        self.glue_client = boto3.client('glue', region_name=self.region)
+
     def read_parquet_from_s3(self):
         print(f"Lendo os dados do S3: {self.input_path}")
         try:
+            # 1. Lê o DataFrame diretamente do caminho da partição.
+            # As colunas de partição (ano, mes, dia) NÃO estarão presentes neste DataFrame.
             df = self.spark.read.parquet(self.input_path)
-            print("Dados lidos com sucesso do S3.")
+            print("Dados lidos do arquivo parquet com sucesso.")
+
+            # 2. Extrai os valores de ano, mês e dia do caminho S3 usando expressões regulares.
+            ano_match = re.search(r"ano=(\d{4})", self.input_path)
+            mes_match = re.search(r"mes=(\d{2})", self.input_path)
+            dia_match = re.search(r"dia=(\d{2})", self.input_path)
+
+            if not (ano_match and mes_match and dia_match):
+                raise ValueError(f"Não foi possível extrair ano, mês e dia do caminho: {self.input_path}")
+
+            ano = ano_match.group(1)
+            mes = mes_match.group(1)
+            dia = dia_match.group(1)
+            print(f"Partições extraídas do caminho: ano={ano}, mes={mes}, dia={dia}")
+
+            # 3. Adiciona as colunas de partição extraídas ao DataFrame.
+            df_with_partitions = df.withColumn("ano", lit(ano)) \
+                                   .withColumn("mes", lit(mes)) \
+                                   .withColumn("dia", lit(dia))
             
-            return df
+            return df_with_partitions
         except Exception as e:
-            print(f"[read_parquet_from_s3] Erro ao ler parquet: {e}")
+            print(f"[read_parquet_from_s3] Erro ao ler parquet e adicionar colunas de partição: {e}")
             raise
 
     def write_parquet_to_s3(self, df):
@@ -61,10 +83,12 @@ class JobELTB3:
 
     def update_glue_catalog(self, df):
       try:
+          refined_table_location = self.get_table_location(self.database_name, self.output_table_name)
           spark = self.glueContext.spark_session
           spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
 
           print(f"Constructed output path for saveAsTable: {self.output_path}")  # Debugging
+          print(f"Output table location: {refined_table_location}")
           print(f"Database: {self.database_name}, Table: {self.output_table_name}")  # Debugging
           print(f"Initiating dynamic partition overwrite for table '{self.database_name}.{self.output_table_name}'...")
 
@@ -72,13 +96,33 @@ class JobELTB3:
           .mode("overwrite") \
           .format("parquet") \
           .partitionBy("ano", "mes", "dia", "data_pregao") \
-          .option("path", self.output_path) \
+          .option("path", refined_table_location) \
           .saveAsTable(f"{self.database_name}.{self.output_table_name}") 
-          print(f"Data saved to '{self.output_path}' and catalog '{self.database_name}.{self.output_table_name}' updated successfully.")
+          print(f"Data saved to '{refined_table_location}' and catalog '{self.database_name}.{self.output_table_name}' updated successfully.")
 
       except Exception as e:
           print(f"[update_glue_catalog] Error overwriting data and updating catalog: {e}")
           raise
+
+    def get_table_location(self, db_name, tbl_name):
+        """
+        Consulta o AWS Glue Catalog usando Boto3 para obter o S3 location de uma tabela.
+        """
+        try:
+            print(f"Consultando o location da tabela '{db_name}.{tbl_name}' via Boto3...")
+            response = self.glue_client.get_table(
+                DatabaseName=db_name,
+                Name=tbl_name
+            )
+            location = response['Table']['StorageDescriptor']['Location']
+            print(f"Location encontrado: {location}")
+            return location
+        except self.glue_client.exceptions.EntityNotFoundException:
+            print(f"A tabela '{db_name}.{tbl_name}' não foi encontrada no catálogo.")
+            return None
+        except Exception as e:
+            print(f"Erro ao consultar a tabela no Glue: {e}")
+            raise
 
 
     def adicionar_data_pregao(self,df):
