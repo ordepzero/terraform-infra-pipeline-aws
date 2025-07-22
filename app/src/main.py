@@ -11,7 +11,8 @@ from awsglue.transforms import *
 from awsglue.dynamicframe import DynamicFrame
 from awsglue.utils import getResolvedOptions
 from awsglue.job import Job
-from pyspark.sql.functions import year, month, dayofmonth,to_date,regexp_replace,col,current_date, lpad, lit
+from pyspark.sql.functions import year, month, dayofmonth,to_date,regexp_replace,col,current_date,col, sum, avg,to_date, lag, datediff,when,lpad, lit
+from pyspark.sql.window import Window
 import re
 import boto3
 import time
@@ -158,6 +159,73 @@ class JobELTB3:
         except Exception as e:
             print(f"Erro na etapa de tratamento do dataframe: {e}")
             raise
+
+        def agrupar_faixa_teorica_qtde(self,df):
+            """
+            Agrupa ações em faixas de Qtde. Teórica.
+            
+            Faixas:
+            - Muito Alta: acima de 5 bilhões
+            - Alta: entre 3 e 5 bilhões
+            - Média: entre 1 e 3 bilhões
+            - Baixa: abaixo de 1 bilhão
+            """
+            print("Classificando ações em faixas de Qtde. Teórica ...")
+            df = df.withColumn(
+                "classificcao_quantidade_teorica",
+                when(col("quantidade_teorica") > 5_000_000_000, "Muito Alta")
+                .when((col("quantidade_teorica") > 3_000_000_000), "Alta")
+                .when((col("quantidade_teorica") > 1_000_000_000), "Média")
+                .otherwise("Baixa")
+            )
+            return df
+            
+    def sumarizacao_tipo(self,df):
+        """
+        Sumarização dos dados por 'Tipo' e calcula:
+        - Soma de Qtde. Teórica
+        - Média de Qtde. Teórica
+        - Soma de Part (%)
+        - Média de Part (%)
+        """
+        # Aplica agregações
+        print("Realizando sumarização dos dados por 'Tipo' ...")
+        sumarizacao = df.groupBy("nome_tipo_acao").agg(
+            sum("quantidade_teorica").alias("total_quantidade_teorica"),
+            avg("quantidade_teorica").alias("media_quantidade_teorica"),
+            sum("percentual_participacao_acao").alias("total_percentual_participacao_acao"),
+            avg("percentual_participacao_acao").alias("media_percentual_participacao_acao")
+            )   
+             
+        return sumarizacao
+
+    def window_variacoes_diarias(self,df):
+            """
+            Aplica função de janela para calcular variações diarias
+            """
+            # Janela ordenada por data para cada código
+            print("Calculando variações diárias ...")
+            janela = Window.partitionBy("codigo_bovespa").orderBy("data_pregao")
+            
+            df = df.withColumn("quantidade_teorica_anterior", lag("quantidade_teorica").over(janela))
+            df = df.withColumn("percentual_participacao_acao_anterior", lag("percentual_participacao_acao").over(janela))
+            
+            df = df.withColumn("variacao_quantidade_teorica", col("quantidade_teorica") - col("quantidade_teorica_anterior")) \
+                   .withColumn("variacao_percentual_participacao_acao_anterior", col("percentual_participacao_acao") - col("percentual_participacao_acao_anterior")) \
+                   .withColumn("intervalo", datediff(col("data_pregao"), lag("data_pregao").over(janela)))
+            
+            return df
+            
+    def window_media_movel(self,df, periodo=3):
+            """
+            Parâmetro
+            - periodo: número de dias para a média móvel (default = 3)
+            """
+            print(f"Calculando média móvel de {periodo} dias ...")
+            # Janela por codigo_bovespa, ordenada por data_pregao, com N dias anteriores
+            janela = Window.partitionBy("codigo_bovespa").orderBy("data_pregao").rowsBetween(-periodo + 1, 0)
+            # Calcula média móvel
+            df = df.withColumn("media_movel_quantidade_teorica", avg("quantidade_teorica").over(janela))
 
     def run(self):
         try:
