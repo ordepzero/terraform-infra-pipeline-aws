@@ -1,3 +1,86 @@
+# Tech Challenge 2 (Fase 2): Pipeline Batch Bovespa: Ingestão e Arquitetura de dados
+
+
+**Tech Challenge** é um projeto que reúne a aplicação dos conhecimentos adquiridos em todas as disciplinas de uma fase da Especialização em Machine Learning Engineering da FIAP PosTech.
+
+Para o Tech Challenge 2, o desafio proposto foi o seguinte:
+
+> 📢 **Problema:** construa um pipeline de dados completo para **Extrair, Processar e Analisar dados do pregão da B3 (IBovespa)**, utilizando AWS S3, Glue, Lambda e Athena. Para acessar os dados, obrigatoriamente acessar o link: [Carteira Teórica o IBovespa](https://sistemaswebb3-listados.b3.com.br/indexPage/day/IBOV?language=pt-br)
+
+Para este desafio as entregas devem ser realizadas utilizando tecnologias da **Amazon Cloud** e atender aos seguintes **Requisitos/objetivos**:
+
+• **Requisito 1:** realizar o scrap de dados do site da B3 (IBovespa), extraindo dados do pregão (dados brutos).
+
+• **Requisito 2:** os dados brutos devem ser ingeridos no S3 em formato parquet com partição diária.
+
+• **Requisito 3:** o Bucket S3 deve acionar uma Lambda, que por sua vez irá chamar um job de ETL no Glue.
+
+• **Requisito 4:** a Lambda pode ser em qualquer linguagem. Ela apenas deverá iniciar o job Glue.
+
+• **Requisito 5:** o job Glue deve ser feito no modo visual. Este job deve conter as seguintes transformações obrigatórias:
+
+5.a: Realizar agrupamento numérico, sumarização, contagem ou soma;
+
+5.b: Renomear duas colunas existentes, além das colunas de agrupamento;
+
+5.c: Realizar um cálculo com campos de data; por exemplo, poder ser duração, comparação ou diferença entre datas.
+
+• **Requisito 6:** os dados refinados no job Glue devem ser salvos no formato parquet em uma pasta chamada REFINED, particionados por data e pelo nome ou abreviação da ação do pregão.
+
+• **Requisito 7:** o job Glue deve automaticamente catalogar o dado no Glue Catalog e criar uma tabela no banco de dados default do Glue Catalog.
+
+• **Requisito 8:** os dados devem estar disponíveis e legíveis no Athena.
+
+• **Requisito 9:** (OPCIONAL) construir um notebook no Athena para realizar uma visualização gráfica dos dados ingeridos.
+
+• **Requisito 10:** (OPCIONAL) construir uma Pipeline Stream Bitcoin, conforme arquitetura de referência fornecida.
+
+## 📌 Objetivos
+
+- Elaborar a **Arquitetura do projeto**, demonstrando todas as fases da pipeline;
+- Implementar as tecnologias para o atendimento dos requisitos da Pipeline de Ingestão de Dados da B3;
+- Documentar o projeto de forma a permitir a sua reprodução;
+- Disponibilizar a documentação em um repositório no **GitHub**.
+
+## Possíveis dores
+
+- Falta de automação na obtenção dos dados bem como seu tratamento;
+- Falta de padronização para acesso aos dados bem como tipos de retornos e formatos mais adequados para consumo na produção de consultas e analytics;
+- Suporte e documentação insuficientes;
+- Redundância de dados em histórico confiável, com fonte de dados própria;
+- Baixa capacidade de análise em questões relevantes para o usuário final.
+
+## Proposta de solução
+
+Em face ao desafio proposto, algumas funcionalidades propostas (stages) para a Pipeline Batch Bovespa:
+
+- Ingestão de dados: coleta automática de dados (webscraping) extraídos do site B3 (IBovespa), por meio de script em Lambda trigado pelo Event Bridge;
+- Armazenamento de dados: salvamento em formato bruto (RAW), com partição diária, em Bucket S3;
+- Processamento: limpeza, transformação e padronização, usando script em Glue acionado pela Lambda e trigado por Event Bridge;
+- Carga final: gravação de dado procesado (REFINED), com partição diária, em Bucket S3;
+- Agregações e Cálculos: agregações e cálculos, usando script em Glue, para análise do comportamento dos dados;
+- Consumo: leitura dos dados refinados e agregados para a produção de relatórios e dashboards, usando Athena e Google Colab.
+
+
+
+**Importante**
+
+Toda a implementação foi feita via Terraform, portanto, com o princípio de **Infrastructure as a Code** e foi documentada neste repositório.
+
+
+
+### 📂 Estrutura do projeto
+
+(inserir)
+
+### 🔩 Arquitetura da solução
+
+A arquitetura da solução foi desenhada com base nos stages necessários ao atendimento de requisitos e consta na pasta de documentação deste repositório. [Link para o Diagrama](inserir figura e link)
+
+## Documentação Terraform
+
+```
+
 # terraform-infra-pipeline-aws
 
 
@@ -89,3 +172,24 @@ AmazonDynamoDBFullAccess
 - Clicar em `Create table`
 
 Feito isso, criar o arquivo .github/workflows/terraform.yaml, .github/workflows/develop.yaml, .github/workflows/prod.yaml
+
+## Vídeo de Apresentação no Youtube
+Para melhor compreensão da entrega, foi produzido um vídeo de apresentação que foi publicado no Youtube:
+
+[Link para a Vídeo](inserir link)
+
+
+## ✒️ Autores
+
+| Nome                            |   RM    | Link do GitHub                                      |
+|---------------------------------|---------|-----------------------------------------------------|
+| Ana Paula de Almeida            | 363602  | [GitHub](https://github.com/Ana9873P)               |
+| Augusto do Nascimento Omena     | 363185  | [GitHub](https://github.com/AugustoOmena)           |
+| Bruno Gabriel de Oliveira       | 361248  | [GitHub](https://github.com/brunogabrieldeoliveira) |
+| José Walmir Gonçalves Duque     | 363196  | [GitHub](https://github.com/WALMIRDUQUE)            |
+| Pedro Henrique da Costa Ulisses | 360864  | [GitHub](https://github.com/ordepzero)              |
+
+## 📄 Licença
+
+Este projeto está licenciado sob a Licença MIT.  
+Consulte o arquivo [license](docs/license/license.txt)  para mais detalhes.
