@@ -123,15 +123,6 @@ resource "aws_security_group" "vpc_endpoints_sg" {
   }
 }
 
-resource "aws_security_group_rule" "glue_job_egress_to_endpoints" {
-  type              = "egress"
-  from_port         = 443
-  to_port           = 443
-  protocol          = "tcp"
-  security_group_id = aws_security_group.vpc_endpoints_sg.id 
-  source_security_group_id = aws_security_group.vpc_endpoints_sg.id  # Corrected
-}
-
 #################################
 #### ROUTE TABLE ASSOCIATION ####
 #################################
@@ -143,12 +134,11 @@ data "aws_subnet" "glue_job_subnet" {
 # Data source para obter a tabela de rotas da sub-rede do Glue Job
 # Isso é necessário para associar o VPC Endpoint S3 à tabela de rotas correta.
 data "aws_route_table" "glue_job_subnet_route_table" {
-  vpc_id = data.aws_subnet.glue_job_subnet.vpc_id
-
-  # Removendo o filtro "association.subnet-id" para focar na "main".
+  # Filtra a tabela de rotas que está DIRETAMENTE associada à sub-rede do Glue.
+  # Isso é mais robusto do que assumir que a sub-rede usa a tabela de rotas principal.
   filter {
-    name   = "association.main"
-    values = ["true"]
+    name   = "association.subnet-id"
+    values = [data.aws_subnet.glue_job_subnet.id]
   }
 }
 
@@ -418,13 +408,10 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
           "ec2:DescribeNetworkInterfaces",
           "ec2:DescribeSubnets",
           "ec2:DescribeSecurityGroups",
-          "ec2:DescribeVpcs",
-          "ec2:DescribeRouteTables",
-          "ec2:DescribeVpcEndpoints",
-          "ec2:Describe*",
-          "ec2:CreateTags"
+          "ec2:DescribeVpcEndpoints"
         ]
-        Resource = "*"
+        # Restringindo a permissão para evitar acesso a todos os recursos EC2.
+        Resource = "*" # Idealmente, isso seria ainda mais restrito a ARNs específicos se possível.
       },
       {
         Effect = "Allow"
@@ -438,19 +425,12 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
       },
       {
         Effect = "Allow",
-        Action = [
-          "cloudwatch:PutMetricData",
-          "logs:CreateLogGroup",
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "s3:PutObject",
-          "s3:GetObject",
-          "s3:ListBucket",
-          "s3:DeleteObject"
-        ],
+        Action = "cloudwatch:PutMetricData",
         # A permissão para métricas não é vinculada a um recurso específico
-        Resource = "*"
+        Resource = "*",
+        "Condition": {
+          "StringEquals": {"cloudwatch:namespace": "AWS/Glue"}
+        }
       }
       ]
   })
