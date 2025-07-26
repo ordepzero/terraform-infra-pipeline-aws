@@ -54,7 +54,7 @@ jobs:
 
         - name: Terraform Init
           run: |
-            cd infra && terraform init -upgrade \
+            cd infra && terraform init \
               -backend-config="bucket=${{ inputs.aws-statefile-s3-bucket }}" \
               -backend-config="key=${{ github.event.repository.name }}" \
               -backend-config="region=${{ inputs.aws-region }}" \
@@ -75,14 +75,10 @@ jobs:
         - name: Terraform Plan
           if: steps.read-destroy-config.outputs.destroy != 'true'
           id: terraform-plan
-          run: |
-            cd infra &&
-            TF_LOG=TRACE terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
-            terraform plan -var-file="./envs/${{ inputs.environment }}/terraform.tfvars" -out="${{ inputs.environment }}.plan"
-          env:
-            AWS_REGION: ${{ inputs.aws-region }}
-            TF_LOG: TRACE # <--- Esta linha é crucial!
-            
+          run: cd infra &&
+            terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
+            terraform plan -var-file="./envs/${{ inputs.environment }}/terraform.tfvars" -out="${{ inputs.environment  }}.plan"
+
         - name: Terraform Apply
           if: steps.read-destroy-config.outputs.destroy != 'true'
           id: terraform-apply

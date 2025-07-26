@@ -1,174 +1,638 @@
+# Data source para obter a região atual
+data "aws_region" "current" {}
+
+# Data source para obter o ID da conta AWS (necessário para a política de logs)
+data "aws_caller_identity" "current" {}
+
 ########################
-### RECURSOS S3 (MANTIDOS COMO ESTÃO) ###
+###   RECURSOS S3    ###
 ########################
 resource "aws_s3_bucket" "bucket_bovespa_raw" {
-  bucket = var.bucket_name_bovespa_raw
+  bucket = var.bucket_name_bovespa_bruto
 }
 
 resource "aws_s3_bucket" "bucket_bovespa_refined" {
-  bucket = var.bucket_name_bovespa_refined
+  bucket = var.bucket_name_bovespa_refinado
+}
+
+resource "aws_s3_bucket" "bucket_artefatos" {
+  bucket = var.bucket_name_artefatos
+}
+
+##################################################
+####   ARTEFATOS PYTHON PARA O GLUE JOB       ####
+##################################################
+
+# 1. Upload do script principal do Glue Job (etl_job.py)
+# O script principal estará em 'app/src/etl_job.py' localmente.
+resource "aws_s3_object" "glue_etl_script" {
+  bucket = aws_s3_bucket.bucket_artefatos.id
+  key    = "app/src/main.py"
+  source = "${path.module}/../app/src/main.py" # Caminho local para o seu script principal
+  etag   = filemd5("${path.module}/../app/src/main.py")
+}
+
+# 2. Criação do arquivo ZIP do diretório 'app/utils'
+# Este data source cria um arquivo ZIP localmente.
+data "archive_file" "python_utils_zip" {
+  type        = "zip"
+  source_dir  = "${path.module}/../app/utils/" # Caminho local para o diretório de utilitários
+  output_path = "app/utils.zip" # Nome do arquivo ZIP que será criado localmente
+  # Garanta que o diretório 'app/utils' exista localmente
+}
+
+
+# 3. Upload do arquivo ZIP para o S3
+# O arquivo ZIP será enviado para 'libraries/app_utils.zip' no bucket de artefatos.
+resource "aws_s3_object" "glue_python_libraries" {
+  bucket = aws_s3_bucket.bucket_artefatos.id
+  key    = "utils.zip"
+  source = data.archive_file.python_utils_zip.output_path # Caminho para o arquivo ZIP gerado
+  etag   = filemd5(data.archive_file.python_utils_zip.output_path) # Garante que o S3 object seja atualizado se o zip mudar
+}
+
+
+############################
+####   SECURITY GROUPS   ###
+############################
+
+resource "aws_security_group" "glue_job_security_group" {
+  name        = "${var.environment}-glue-job-sg"
+  description = "Security group for AWS Glue jobs in VPC"
+  vpc_id      = var.vpc_id # Você precisará definir esta variável (o ID da sua VPC)
+
+  tags = {
+    Name = "${var.environment}-glue-job-sg"
+  }
+}
+
+# Regra de Security Group para permitir todo o tráfego de entrada do próprio SG
+# Isso é necessário para a comunicação interna dos componentes do Glue Job na VPC.
+resource "aws_security_group_rule" "glue_self_ingress_all" {
+  type              = "ingress"
+  from_port         = 0
+  to_port           = 65535
+  protocol          = -1 # -1 significa todos os protocolos
+  security_group_id = aws_security_group.glue_job_security_group.id
+  self              = true # Permite tráfego de e para o próprio Security Group
+  description       = "Required for AWS Glue internal communication within VPC"
+}
+
+resource "aws_security_group_rule" "endpoints_ingress_from_glue_job" {
+  type                     = "ingress"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.vpc_endpoints_sg.id
+  source_security_group_id = aws_security_group.glue_job_security_group.id
+  description              = "Allow HTTPS from Glue Job"
+}
+
+
+# Regra de SAÍDA para o SG do Glue Job: Permite DNS. Necessário para resolver nomes de endpoints.
+resource "aws_security_group_rule" "glue_job_egress_dns" {
+  type              = "egress"
+  from_port         = 53
+  to_port           = 53
+  protocol          = "udp"
+  cidr_blocks       = [data.aws_vpc.default.cidr_block] # Ou o CIDR da sua VPC
+  security_group_id = aws_security_group.glue_job_security_group.id
+  description       = "Allow DNS resolution within the VPC"
+}
+
+# Regra de Security Group para permitir todo o tráfego de saída
+# Isso é comum para Glue Jobs, permitindo acesso a S3, CloudWatch, etc.
+resource "aws_security_group_rule" "glue_egress_all" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1" # -1 significa todos os protocolos
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.glue_job_security_group.id
+  description       = "Allow all outbound traffic"
+}
+
+
+resource "aws_security_group" "vpc_endpoints_sg" {
+  name        = "${var.environment}-vpc-endpoints-sg"
+  description = "Security group for VPC Interface Endpoints"
+  vpc_id      = var.vpc_id
+
+  tags = {
+    Name = "${var.environment}-vpc-endpoints-sg"
+  }
+}
+
+resource "aws_security_group_rule" "glue_job_egress_to_endpoints" {
+  type              = "egress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  security_group_id = aws_security_group.vpc_endpoints_sg.id 
+  source_security_group_id = aws_security_group.vpc_endpoints_sg.id  # Corrected
+}
+
+#################################
+#### ROUTE TABLE ASSOCIATION ####
+#################################
+
+data "aws_subnet" "glue_job_subnet" {
+  id = var.subnet_id
+}
+
+# Data source para obter a tabela de rotas da sub-rede do Glue Job
+# Isso é necessário para associar o VPC Endpoint S3 à tabela de rotas correta.
+data "aws_route_table" "glue_job_subnet_route_table" {
+  vpc_id = data.aws_subnet.glue_job_subnet.vpc_id
+
+  # Removendo o filtro "association.subnet-id" para focar na "main".
+  filter {
+    name   = "association.main"
+    values = ["true"]
+  }
+}
+
+# NOVO: VPC Endpoint de Gateway para S3
+# Permite que o Glue Job acesse o S3 de dentro da VPC sem precisar de NAT Gateway ou Internet Gateway.
+resource "aws_vpc_endpoint" "s3_gateway_endpoint" {
+  vpc_id       = var.vpc_id
+  service_name = "com.amazonaws.${data.aws_region.current.region}.s3"
+  vpc_endpoint_type = "Gateway" # Tipo Gateway para S3
+
+  # Associa o endpoint à tabela de rotas da sub-rede do Glue Job
+  route_table_ids = [data.aws_route_table.glue_job_subnet_route_table.id]
+
+  tags = {
+    Name = "${var.environment}-s3-gateway-endpoint"
+  }
+}
+
+# NOVO: VPC Endpoint de Interface para CloudWatch Logs
+# Permite que o Glue Job envie logs de dentro da VPC.
+resource "aws_vpc_endpoint" "logs_interface_endpoint" {
+  vpc_id            = var.vpc_id
+  service_name      = "com.amazonaws.${data.aws_region.current.region}.logs"
+  vpc_endpoint_type = "Interface"
+  private_dns_enabled = true
+
+  subnet_ids         = [var.subnet_id]
+  security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
+
+  tags = {
+    Name = "${var.environment}-logs-interface-endpoint"
+  }
+}
+
+# NOVO: VPC Endpoint de Gateway para Athena
+# Permite que o Glue Job execute queries no Athena de dentro da VPC.
+resource "aws_vpc_endpoint" "athena_interface_endpoint" {
+  vpc_id            = var.vpc_id
+  service_name      = "com.amazonaws.${data.aws_region.current.region}.athena"
+  vpc_endpoint_type = "Interface"
+  private_dns_enabled = true
+
+  subnet_ids         = [var.subnet_id]
+  security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
+}
+
+resource "aws_vpc_endpoint" "glue_interface_endpoint" {
+  vpc_id            = var.vpc_id
+  service_name      = "com.amazonaws.${data.aws_region.current.region}.glue"
+  vpc_endpoint_type = "Interface"
+  private_dns_enabled = true
+
+  subnet_ids         = [var.subnet_id]
+  security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
+
+  tags = { Name = "${var.environment}-glue-interface-endpoint" }
+}
+
+###########################
+###   GLUE CONNECTION   ###
+###########################
+resource "aws_glue_connection" "glue_connection" {
+  name        = "glue_connection"
+  description = "Glue connection"
+  connection_type = "NETWORK" # Ou JDBC, KAFKA, MONGODB, etc.
+  physical_connection_requirements {
+    availability_zone = "sa-east-1a"
+    # Agora referenciamos o ID do Security Group que acabamos de criar
+    security_group_id_list = [aws_security_group.glue_job_security_group.id] 
+    subnet_id = var.subnet_id
+  }
+}
+
+# Data source para obter a VPC
+data "aws_vpc" "default" {
+  id = var.vpc_id
 }
 
 
 ########################
-### CRIANDO ROLES IAM DEDICADAS ###
+###    GLUE JOB      ###
 ########################
 
-# Role para a Step Functions executar suas tarefas (ex: logs, Lambda, etc.)
-resource "aws_iam_role" "sfn_execution_role" {
-  name = "sfn-execution-role-${var.enviroment}"
+
+resource "aws_glue_job" "etl_job" {
+  name              = var.glue_job_data_prep
+  description       = "Glue ETL job"
+  role_arn          = aws_iam_role.glue_job_role.arn
+  glue_version      = "4.0"
+  max_retries       = 0
+  timeout           = 5
+  number_of_workers = 2
+  worker_type       = "G.1X"
+  connections       = [aws_glue_connection.glue_connection.name]
+  execution_class   = "STANDARD"
+
+  command {
+    script_location = "s3://${aws_s3_bucket.bucket_artefatos.bucket}/app/src/main.py"
+    name            = "glueetl"
+    python_version  = "3"
+  }
+
+  notification_property {
+    notify_delay_after = 3 # delay in minutes
+  }
+
+  default_arguments = {
+    "--job-language"                     = "python"
+    "--continuous-log-logGroup"          = "/aws-glue/jobs"
+    "--enable-continuous-cloudwatch-log" = "true"
+    "--enable-continuous-log-filter"     = "true"
+    "--enable-metrics"                   = ""
+    "--enable-auto-scaling"              = "true"
+    "--enable-glue-datacatalog"          = "true"
+    "--extra-py-files"                   = "s3://${aws_s3_bucket.bucket_artefatos.bucket}/utils.zip"
+    # Passando os caminhos e nomes dinamicamente para o script Python
+    "--INPUT_PATH"                       = "s3://${aws_s3_bucket.bucket_bovespa_raw.bucket}/"
+    "--OUTPUT_PATH"                      = "s3://${aws_s3_bucket.bucket_bovespa_refined.bucket}/"
+    "--DATABASE_NAME"                    = aws_glue_catalog_database.refined_database.name
+    "--TABLE_NAME"                       = var.table_bovespa_raw
+    "--OUTPUT_TABLE_NAME"                = var.table_bovespa_refined
+    "--ATHENA_OUTPUT_BUCKET"             = "s3://${aws_s3_bucket.bucket_artefatos.bucket}/athena-query-results/"
+  }
+
+  execution_property {
+    max_concurrent_runs = 1
+  }
+
+  tags = {
+    "ManagedBy" = "AWS"
+  }
+}
+
+# IAM role for Glue jobs
+resource "aws_iam_role" "glue_job_role" {
+  name = "${var.environment}-glue-job-role"
 
   assume_role_policy = jsonencode({
-    Version = "2012-10-17",
+    Version = "2012-10-17"
     Statement = [
       {
-        Action = "sts:AssumeRole",
-        Effect = "Allow",
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
         Principal = {
-          # Este serviço é quem assume a role para executar a Step Functions
-          Service = "states.${data.aws_region.current.name}.amazonaws.com" # Use data.aws_region para ser dinâmico
+          Service = "glue.amazonaws.com"
         }
       }
     ]
   })
 }
 
-# Política para permitir que a Step Functions escreva logs no CloudWatch
-resource "aws_iam_policy" "sfn_logs_policy" {
-  name        = "sfn-logs-policy-${var.enviroment}"
-  description = "Allows Step Functions to write logs to CloudWatch"
+# Adicione as políticas de permissão necessárias para a role do Glue Job
+# para acessar os buckets S3 e o CloudWatch Logs.
+resource "aws_iam_role_policy" "glue_job_s3_access" {
+  name = "glue-job-s3-access"
+  role = aws_iam_role.glue_job_role.id
 
   policy = jsonencode({
-    Version = "2012-10-17",
+    Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow",
-        Action   = [
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject", # Permissão para escrever dados
+          "s3:DeleteObject", # Necessário para o modo overwrite
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.bucket_bovespa_raw.arn,
+          "${aws_s3_bucket.bucket_bovespa_raw.arn}/*",
+          aws_s3_bucket.bucket_bovespa_refined.arn,
+          "${aws_s3_bucket.bucket_bovespa_refined.arn}/*",
+          aws_s3_bucket.bucket_artefatos.arn,
+          "${aws_s3_bucket.bucket_artefatos.arn}/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws-glue/jobs:*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "glue:CreateTable",
+          "glue:GetConnection",
+          "glue:GetDatabase",
+          "glue:GetTable",
+          "glue:UpdateTable",
+          "glue:BatchCreatePartition",
+          "glue:DeleteTable"
+        ]
+        # Permissão para acessar o Glue Catalog
+        # Ajuste o ARN conforme necessário para o seu Glue Catalog
+        Resource = [
+            "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:catalog",
+            "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:connection/*",
+            "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:database/*",
+            "arn:aws:glue:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:table/*"
+            ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateNetworkInterface",
+          "ec2:DeleteNetworkInterface",
+          "ec2:DescribeNetworkInterfaces",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeVpcs",
+          "ec2:DescribeRouteTables",
+          "ec2:DescribeVpcEndpoints",
+          "ec2:Describe*",
+          "ec2:CreateTags"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+            "athena:StartQueryExecution",
+            "athena:GetQueryExecution"
+        ]
+        Resource = [
+            "arn:aws:athena:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workgroup/primary"
+            ]
+      },
+      {
+        Effect = "Allow",
+        Action = [
+          "cloudwatch:PutMetricData",
+          "logs:CreateLogGroup",
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
-          "logs:DescribeLogStreams" # Pode ser útil para depuração
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:ListBucket",
+          "s3:DeleteObject"
         ],
-        Resource = "arn:aws:logs:*:*:log-group:/aws/vendedlogs/states/generic-stepfunction-${var.enviroment}:*" # Ajustar o caminho do log group
+        # A permissão para métricas não é vinculada a um recurso específico
+        Resource = "*"
       }
-    ]
+      ]
   })
 }
 
-# Anexar a política de logs à role de execução da Step Functions
-resource "aws_iam_role_policy_attachment" "sfn_logs_attachment" {
-  role       = aws_iam_role.sfn_execution_role.name
-  policy_arn = aws_iam_policy.sfn_logs_policy.arn
+
+#############################################
+#####   LAMBDA INICIALIZA O GLUE JOB   ######
+#############################################
+
+data "archive_file" "lambda_function_zip" {
+  type        = "zip"
+  source_file = "${path.module}/../lambda/lambda_function.py"
+  output_path = "${path.module}/../lambda/lambda_function.py"
 }
 
-# Opcional: Se sua Step Functions chamar outros serviços (Lambda, DynamoDB, etc.), adicione políticas aqui.
-# Exemplo:
-# resource "aws_iam_policy_attachment" "sfn_lambda_invoke_attachment" {
-#   role       = aws_iam_role.sfn_execution_role.name
-#   policy_arn = "arn:aws:iam::aws:policy/AWSLambda_FullAccess" # Ou uma política mais restritiva
-# }
+resource "aws_lambda_function" "lambda_inicia_glue_job" {
+  function_name = var.lambda_name_inicia_glue_job
+  role          = aws_iam_role.lambda_execution_role.arn
+  handler       = "lambda_function.lambda_handler"
+  runtime       = "python3.9"
 
+  filename         = data.archive_file.lambda_function_zip.output_path
+  source_code_hash = data.archive_file.lambda_function_zip.output_base64sha256
 
-# Role para o EventBridge invocar a Step Functions
-resource "aws_iam_role" "eventbridge_invoke_sfn_role" {
-  name = "eventbridge-invoke-sfn-role-${var.enviroment}"
+  environment {
+    variables = {
+      GLUE_JOB_NAME = var.glue_job_data_prep
+    }
+  }
+
+  tags = {
+    "ManagedBy" = "AWS"
+  }
+}
+
+resource "aws_iam_role" "lambda_execution_role" {
+  name = "${var.environment}-lambda-execution-role"
 
   assume_role_policy = jsonencode({
-    Version = "2012-10-17",
+    Version = "2012-10-17"
     Statement = [
       {
-        Action = "sts:AssumeRole",
-        Effect = "Allow",
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
         Principal = {
-          Service = "events.amazonaws.com" # Este serviço é quem assume a role para disparar a SFN
+          Service = "lambda.amazonaws.com"
         }
       }
     ]
   })
 }
-
-# Política para permitir que o EventBridge inicie a Step Functions
-resource "aws_iam_policy" "eventbridge_sfn_start_execution_policy" {
-  name        = "eventbridge-sfn-start-execution-policy-${var.enviroment}"
-  description = "Allows EventBridge to start Step Functions executions"
+resource "aws_iam_role_policy" "lambda_s3_access" {
+  name = "lambda-s3-access"
+  role = aws_iam_role.lambda_execution_role.id
 
   policy = jsonencode({
-    Version = "2012-10-17",
+    Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow",
-        Action   = "states:StartExecution",
-        # Permissão para iniciar *esta* Step Functions específica
-        Resource = aws_sfn_state_machine.generic_step_function.arn
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.bucket_bovespa_raw.arn,
+          "${aws_s3_bucket.bucket_bovespa_raw.arn}/*",
+          aws_s3_bucket.bucket_bovespa_refined.arn,
+          "${aws_s3_bucket.bucket_bovespa_refined.arn}/*",
+          aws_s3_bucket.bucket_artefatos.arn,
+          "${aws_s3_bucket.bucket_artefatos.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+resource "aws_iam_role_policy" "lambda_policy" {
+  name = "lambda-glue-trigger-policy"
+  role = aws_iam_role.lambda_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/*:*"
+      },
+      {
+        Effect = "Allow"
+        Action = "glue:StartJobRun"
+        Resource = aws_glue_job.etl_job.arn
+      },
+      {
+        Effect = "Allow",
+        Action = [
+            "glue:CreatePartition",
+            "glue:GetTable",
+            "glue:GetDatabase",
+            "glue:GetPartitions",
+            "glue:CreateDatabase"
+        ],
+        Resource = "*"
       }
     ]
   })
 }
 
-# Anexar a política de invocação à role do EventBridge
-resource "aws_iam_role_policy_attachment" "eventbridge_sfn_attachment" {
-  role       = aws_iam_role.eventbridge_invoke_sfn_role.name
-  policy_arn = aws_iam_policy.eventbridge_sfn_start_execution_policy.arn
+#############################################
+#####   S3 Notification para Lambda   #######
+#############################################
+
+# Permissão para o S3 invocar a função Lambda
+resource "aws_lambda_permission" "allow_s3_to_call_lambda" {
+  statement_id  = "AllowS3InvokeLambda"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.lambda_inicia_glue_job.function_name
+  principal     = "s3.amazonaws.com"
+  # O source_arn deve ser o ARN do bucket que irá disparar a notificação
+  source_arn    = aws_s3_bucket.bucket_bovespa_raw.arn
 }
 
-# Remova ou renomeie as roles/usuários/grupos/políticas "generic_" se elas não forem mais necessárias
-# ou se quiser ter uma convenção mais clara.
-# Por exemplo, "aws_iam_user.generic_user", "aws_iam_role.generic_role", etc.
-# Parecem ser genéricas e não diretamente relacionadas ao EventBridge/Step Functions.
+# Configuração de notificação do bucket S3
+resource "aws_s3_bucket_notification" "bovespa_raw_to_lambda" {
+  bucket = aws_s3_bucket.bucket_bovespa_raw.id
 
-################################################
-##### STEPFUNCTION (CORRIGIDA ROLE_ARN) #######
-################################################
-resource "aws_sfn_state_machine" "generic_step_function" {
-  name     = "generic-stepfunction-${var.enviroment}"
-  # Use a role dedicada para execução da Step Functions
-  role_arn = aws_iam_role.sfn_execution_role.arn
-  type     = "STANDARD"
+  # Configuração para eventos de criação de objeto (Put, Post, Copy, MultipartUpload)
+  lambda_function {
+    lambda_function_arn = aws_lambda_function.lambda_inicia_glue_job.arn
+    events              = ["s3:ObjectCreated:*"] # Dispara para qualquer criação de objeto
+    # Opcional: prefix e/ou suffix para filtrar eventos por caminho/extensão
+    # filter_prefix       = "raw_data/"
+    # filter_suffix       = ".csv"
+  }
 
-  definition = jsonencode({
-    Comment = "A simple state machine that takes input and passes it through."
-    StartAt = "PassState"
-    States = {
-      PassState = {
-        Type = "Pass"
-        End  = true
-      }
-    }
-  })
+  # Depende da permissão para garantir que a permissão seja criada antes da notificação
+  depends_on = [aws_lambda_permission.allow_s3_to_call_lambda]
 }
 
-################################################
-##### EVENTBRIDGE (CORRIGIDA REGRA E ROLE) #####
-################################################
+#############################################
+#####   LAMBDA SCRAPPER SALVA PARQUET  ######
+#############################################
 
-resource "aws_cloudwatch_event_rule" "generic_trigger_step_function_rule" {
-  name                = "event-bridge-${var.enviroment}"
-  description         = "Iniciar generic stepfunction a cada 5 minutos"
-  # Removido o 'event_pattern' para evitar conflito. Apenas o schedule_expression será usado.
-  schedule_expression = "rate(5 minutes)"
+module "lambda_functions_scrapper" {
+  source = "terraform-aws-modules/lambda/aws"
+  
+  function_name = var.lambda_name_scrap_b3
+  description   = var.lambda_name_scrap_b3
+  handler       = "lambda_functions_scrapper.lambda_handler"
+  runtime       = "python3.13"
+
+  source_path = "${path.module}/../lambda/lambda_functions_scrapper.py"
+  memory_size = 512
+  timeout     = 60
+  create_role = false
+  lambda_role    = aws_iam_role.lambda_execution_role.arn
+  environment_variables = {
+    S3_BUCKET_NAME     = var.bucket_name_bovespa_bruto
+    GLUE_DATABASE_NAME = aws_glue_catalog_database.raw_database.name
+    GLUE_TABLE_NAME    = var.table_bovespa_raw
+  }
+
+  layers = [var.lambda_layer_scrapper_artefatos_arn]
+
+  tags = {
+    Name = "my-lambda1"
+  }
 }
 
-resource "aws_cloudwatch_event_target" "invoke_step_function_target" {
-  rule      = aws_cloudwatch_event_rule.generic_trigger_step_function_rule.name
-  arn       = aws_sfn_state_machine.generic_step_function.arn
-
-  # Definindo o input JSON.
-  # Use '<aws.events.event.time>' para pegar o timestamp do evento EventBridge
-  # Se precisar do ID da execução da Step Functions (que só existe depois de iniciar),
-  # você pode acessar em `$$.Execution.Id` *dentro* da Step Functions.
-  input = jsonencode({
-    "eventName" : "ScheduledEvent",
-    "timestamp" : "<aws.events.event.time>", # EventBridge context variable for event time
-    "data"      : {
-      "message": "Este é um input de exemplo do EventBridge para a Step Functions!",
-      "environment": var.enviroment, # Use a variável do Terraform aqui
-      "recordCount": 123
-    }
-  })
-
-  # Use a role dedicada para o EventBridge invocar a Step Functions
-  role_arn = aws_iam_role.eventbridge_invoke_sfn_role.arn
+############################################################
+#### Agendador (EventBridge Rule) para a função Lambda  ####
+############################################################
+resource "aws_cloudwatch_event_rule" "ibov_scraper_schedule" {
+  name                = "ibov-scraper-daily-schedule"
+  description         = "Agenda a execução da função Lambda de scraping do IBovespa diariamente."
+  schedule_expression = "cron(0 12 * * ? *)" # Exemplo: executa a cada 1 dia. Use "cron(0 12 * * ? *)" para 12:00 UTC diariamente.
+  state          = "ENABLED"
+  tags = {
+    Name = "ibov-scraper-schedule"
+  }
 }
 
-# Data source para obter a região atual, útil para o service principal da SFN
-data "aws_region" "current" {}
+# Permissão para o EventBridge invocar a função Lambda
+resource "aws_lambda_permission" "allow_cloudwatch_to_call_ibov_scraper" {
+  statement_id  = "AllowExecutionFromCloudWatch"
+  action        = "lambda:InvokeFunction"
+  function_name = module.lambda_functions_scrapper.lambda_function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.ibov_scraper_schedule.arn
+}
+
+# Define o alvo do agendador (a função Lambda)
+resource "aws_cloudwatch_event_target" "ibov_scraper_target" {
+  rule      = aws_cloudwatch_event_rule.ibov_scraper_schedule.name
+  target_id = "ibov-scraper-lambda-target"
+  arn       = module.lambda_functions_scrapper.lambda_function_arn
+}
+
+####################################
+####### GLUE CATALOG DATABASE ######
+####################################
+resource "aws_glue_catalog_database" "raw_database" {
+  name       = var.database_bovespa_raw
+  catalog_id = data.aws_caller_identity.current.account_id
+  # ...
+}
+
+resource "aws_glue_catalog_database" "refined_database" {
+  name       = var.database_bovespa_refined
+  catalog_id = data.aws_caller_identity.current.account_id
+  # ...
+}
+module "raw_layer_tables" {
+  source = "./modules/table/raw" # Aponta para o diretório do módulo da camada RAW
+
+  database_name              = aws_glue_catalog_database.raw_database.name # Passa o nome do DB RAW
+  environment                = var.environment
+  bucket_name_bovespa_bruto  = var.bucket_name_bovespa_bruto
+  table_bovespa_raw          = var.table_bovespa_raw
+  
+  depends_on = [aws_glue_catalog_database.raw_database, aws_s3_bucket.bucket_bovespa_raw]
+}
+
+
+module "refined_layer_tables" {
+  source = "./modules/table/refined" 
+
+  database_name              = aws_glue_catalog_database.refined_database.name # Passa o nome do DB RAW
+  environment                = var.environment
+  bucket_name_bovespa_refinado  = var.bucket_name_bovespa_refinado
+  table_bovespa_refined          = var.table_bovespa_refined
+  
+  depends_on = [aws_glue_catalog_database.refined_database, aws_s3_bucket.bucket_bovespa_refined]
+}
