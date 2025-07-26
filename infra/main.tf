@@ -152,7 +152,7 @@ data "aws_route_table" "glue_job_subnet_route_table" {
   }
 }
 
-data "aws_vpc_endpoints" "all_endpoints" {
+data "aws_vpc_endpoint" "all_endpoints" {
   filter {
     name   = "vpc-id"
     values = ["vpc-03cb423171b0bf0e1"]
