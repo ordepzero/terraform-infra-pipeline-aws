@@ -177,6 +177,9 @@ module "vpc_endpoints" {
       tags = {
         Name = "${var.environment}-logs-interface-endpoint"
       }
+
+      count = var.create_logs_endpoint ? 1 : 0
+
     }
 
     athena = {
@@ -186,6 +189,9 @@ module "vpc_endpoints" {
       tags = {
         Name = "${var.environment}-athena-interface-endpoint"
       }
+
+      count = var.create_athena_endpoint ? 1 : 0
+
     }
 
     glue = {
@@ -195,6 +201,9 @@ module "vpc_endpoints" {
       tags = {
         Name = "${var.environment}-glue-interface-endpoint"
       }
+
+      count = var.create_glue_endpoint ? 1 : 0
+
     }
   }
 
