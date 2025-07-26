@@ -68,3 +68,15 @@ variable "subnet_id" {
   description = "The subnet ID where the Lambda function will be deployed."
   type        = string
 }
+
+variable "create_glue_endpoint" {
+  type    = bool
+}
+
+variable "create_logs_endpoint" {
+  type    = bool
+}
+
+variable "create_athena_endpoint" {
+  type    = bool
+}
