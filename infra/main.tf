@@ -123,6 +123,15 @@ resource "aws_security_group" "vpc_endpoints_sg" {
   }
 }
 
+resource "aws_security_group_rule" "glue_job_egress_to_endpoints" {
+  type              = "egress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  security_group_id = aws_security_group.vpc_endpoints_sg.id 
+  source_security_group_id = aws_security_group.vpc_endpoints_sg.id  # Corrected
+}
+
 #################################
 #### ROUTE TABLE ASSOCIATION ####
 #################################
@@ -134,122 +143,71 @@ data "aws_subnet" "glue_job_subnet" {
 # Data source para obter a tabela de rotas da sub-rede do Glue Job
 # Isso é necessário para associar o VPC Endpoint S3 à tabela de rotas correta.
 data "aws_route_table" "glue_job_subnet_route_table" {
-  # Filtra a tabela de rotas que está DIRETAMENTE associada à sub-rede do Glue.
-  # Isso é mais robusto do que assumir que a sub-rede usa a tabela de rotas principal.
+  vpc_id = data.aws_subnet.glue_job_subnet.vpc_id
+
+  # Removendo o filtro "association.subnet-id" para focar na "main".
   filter {
-    name   = "association.subnet-id"
-    values = [data.aws_subnet.glue_job_subnet.id]
+    name   = "association.main"
+    values = ["true"]
   }
 }
 
-# --- Padrão "Read-or-Create" para VPC Endpoints ---
-# Este padrão verifica se um endpoint já existe na VPC. Se existir, ele usa o existente.
-# Se não existir, ele o cria. Isso evita erros ("RouteAlreadyExists", "conflicting DNS domain")
-# ao aplicar o Terraform em ambientes onde os endpoints já podem ter sido criados.
-
-# 1. S3 Gateway Endpoint
-data "aws_vpc_endpoints" "s3_gateway_existing" {
-  filter {
-    name   = "vpc-id"
-    values = [var.vpc_id]
-  }
-  filter {
-    name   = "service-name"
-    values = ["com.amazonaws.${data.aws_region.current.region}.s3"]
-  }
-  filter {
-    name   = "vpc-endpoint-type"
-    values = ["Gateway"]
-  }
-}
-
+# NOVO: VPC Endpoint de Gateway para S3
+# Permite que o Glue Job acesse o S3 de dentro da VPC sem precisar de NAT Gateway ou Internet Gateway.
 resource "aws_vpc_endpoint" "s3_gateway_endpoint" {
-  # Cria o recurso apenas se o data source acima não encontrar nenhum endpoint existente.
-  count = length(data.aws_vpc_endpoints.s3_gateway_existing.ids) == 0 ? 1 : 0
-
-  vpc_id            = var.vpc_id
-  service_name      = "com.amazonaws.${data.aws_region.current.region}.s3"
+  vpc_id       = var.vpc_id
+  service_name = "com.amazonaws.${data.aws_region.current.region}.s3"
   vpc_endpoint_type = "Gateway" # Tipo Gateway para S3
-  route_table_ids   = [data.aws_route_table.glue_job_subnet_route_table.id]
+
+  # Associa o endpoint à tabela de rotas da sub-rede do Glue Job
+  route_table_ids = [data.aws_route_table.glue_job_subnet_route_table.id]
+
   tags = {
     Name = "${var.environment}-s3-gateway-endpoint"
   }
 }
 
-# 2. CloudWatch Logs Interface Endpoint
-data "aws_vpc_endpoints" "logs_interface_existing" {
-  filter {
-    name   = "vpc-id"
-    values = [var.vpc_id]
-  }
-  filter {
-    name   = "service-name"
-    values = ["com.amazonaws.${data.aws_region.current.region}.logs"]
-  }
-}
-
+# NOVO: VPC Endpoint de Interface para CloudWatch Logs
+# Permite que o Glue Job envie logs de dentro da VPC.
 resource "aws_vpc_endpoint" "logs_interface_endpoint" {
-  count = length(data.aws_vpc_endpoints.logs_interface_existing.ids) == 0 ? 1 : 0
-
-  vpc_id              = var.vpc_id
-  service_name        = "com.amazonaws.${data.aws_region.current.region}.logs"
-  vpc_endpoint_type   = "Interface"
+  vpc_id            = var.vpc_id
+  service_name      = "com.amazonaws.${data.aws_region.current.region}.logs"
+  vpc_endpoint_type = "Interface"
   private_dns_enabled = true
-  subnet_ids          = [var.subnet_id]
-  security_group_ids  = [aws_security_group.vpc_endpoints_sg.id]
+
+  subnet_ids         = [var.subnet_id]
+  security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
+
   tags = {
     Name = "${var.environment}-logs-interface-endpoint"
   }
 }
 
-# 3. Athena Interface Endpoint
-data "aws_vpc_endpoints" "athena_interface_existing" {
-  filter {
-    name   = "vpc-id"
-    values = [var.vpc_id]
-  }
-  filter {
-    name   = "service-name"
-    values = ["com.amazonaws.${data.aws_region.current.region}.athena"]
-  }
-}
-
+# NOVO: VPC Endpoint de Gateway para Athena
+# Permite que o Glue Job execute queries no Athena de dentro da VPC.
 resource "aws_vpc_endpoint" "athena_interface_endpoint" {
-  count = length(data.aws_vpc_endpoints.athena_interface_existing.ids) == 0 ? 1 : 0
-
-  vpc_id              = var.vpc_id
-  service_name        = "com.amazonaws.${data.aws_region.current.region}.athena"
-  vpc_endpoint_type   = "Interface"
+  vpc_id            = var.vpc_id
+  service_name      = "com.amazonaws.${data.aws_region.current.region}.athena"
+  vpc_endpoint_type = "Interface"
   private_dns_enabled = true
-  subnet_ids          = [var.subnet_id]
-  security_group_ids  = [aws_security_group.vpc_endpoints_sg.id]
+
+  subnet_ids         = [var.subnet_id]
+  security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
   tags = {
     Name = "${var.environment}-athena-interface-endpoint"
   }
 }
 
-# 4. Glue Interface Endpoint
-data "aws_vpc_endpoints" "glue_interface_existing" {
-  filter {
-    name   = "vpc-id"
-    values = [var.vpc_id]
-  }
-  filter {
-    name   = "service-name"
-    values = ["com.amazonaws.${data.aws_region.current.region}.glue"]
-  }
-}
-
 resource "aws_vpc_endpoint" "glue_interface_endpoint" {
-  count = length(data.aws_vpc_endpoints.glue_interface_existing.ids) == 0 ? 1 : 0
-
-  vpc_id              = var.vpc_id
-  service_name        = "com.amazonaws.${data.aws_region.current.region}.glue"
-  vpc_endpoint_type   = "Interface"
+  vpc_id            = var.vpc_id
+  service_name      = "com.amazonaws.${data.aws_region.current.region}.glue"
+  vpc_endpoint_type = "Interface"
   private_dns_enabled = true
-  subnet_ids          = [var.subnet_id]
-  security_group_ids  = [aws_security_group.vpc_endpoints_sg.id]
-  tags                = { Name = "${var.environment}-glue-interface-endpoint" }
+
+  subnet_ids         = [var.subnet_id]
+  security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
+
+  tags = { Name = "${var.environment}-glue-interface-endpoint" }
 }
 
 ###########################
@@ -408,10 +366,13 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
           "ec2:DescribeNetworkInterfaces",
           "ec2:DescribeSubnets",
           "ec2:DescribeSecurityGroups",
-          "ec2:DescribeVpcEndpoints"
+          "ec2:DescribeVpcs",
+          "ec2:DescribeRouteTables",
+          "ec2:DescribeVpcEndpoints",
+          "ec2:Describe*",
+          "ec2:CreateTags"
         ]
-        # Restringindo a permissão para evitar acesso a todos os recursos EC2.
-        Resource = "*" # Idealmente, isso seria ainda mais restrito a ARNs específicos se possível.
+        Resource = "*"
       },
       {
         Effect = "Allow"
@@ -425,12 +386,19 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
       },
       {
         Effect = "Allow",
-        Action = "cloudwatch:PutMetricData",
+        Action = [
+          "cloudwatch:PutMetricData",
+          "logs:CreateLogGroup",
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:ListBucket",
+          "s3:DeleteObject"
+        ],
         # A permissão para métricas não é vinculada a um recurso específico
-        Resource = "*",
-        "Condition": {
-          "StringEquals": {"cloudwatch:namespace": "AWS/Glue"}
-        }
+        Resource = "*"
       }
       ]
   })
