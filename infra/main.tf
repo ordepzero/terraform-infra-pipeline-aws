@@ -175,7 +175,7 @@ data "aws_vpc_endpoint" "s3_gateway_existing" {
 
 resource "aws_vpc_endpoint" "s3_gateway_endpoint" {
   # Cria o recurso apenas se o data source acima não encontrar nenhum endpoint existente.
-  count = length(data.aws_vpc_endpoint.s3_gateway_existing.ids) == 0 ? 1 : 0
+  count = length(data.aws_vpc_endpoint.s3_gateway_existing.id) == 0 ? 1 : 0
 
   vpc_id            = var.vpc_id
   service_name      = "com.amazonaws.${data.aws_region.current.region}.s3"
@@ -199,7 +199,7 @@ data "aws_vpc_endpoint" "logs_interface_existing" {
 }
 
 resource "aws_vpc_endpoint" "logs_interface_endpoint" {
-  count = length(data.aws_vpc_endpoint.logs_interface_existing.ids) == 0 ? 1 : 0
+  count = length(data.aws_vpc_endpoint.logs_interface_existing.id) == 0 ? 1 : 0
 
   vpc_id              = var.vpc_id
   service_name        = "com.amazonaws.${data.aws_region.current.region}.logs"
@@ -225,7 +225,7 @@ data "aws_vpc_endpoint" "athena_interface_existing" {
 }
 
 resource "aws_vpc_endpoint" "athena_interface_endpoint" {
-  count = length(data.aws_vpc_endpoint.athena_interface_existing.ids) == 0 ? 1 : 0
+  count = length(data.aws_vpc_endpoint.athena_interface_existing.id) == 0 ? 1 : 0
 
   vpc_id              = var.vpc_id
   service_name        = "com.amazonaws.${data.aws_region.current.region}.athena"
@@ -251,7 +251,7 @@ data "aws_vpc_endpoint" "glue_interface_existing" {
 }
 
 resource "aws_vpc_endpoint" "glue_interface_endpoint" {
-  count = length(data.aws_vpc_endpoint.glue_interface_existing.ids) == 0 ? 1 : 0
+  count = length(data.aws_vpc_endpoint.glue_interface_existing.id) == 0 ? 1 : 0
 
   vpc_id              = var.vpc_id
   service_name        = "com.amazonaws.${data.aws_region.current.region}.glue"
