@@ -156,6 +156,8 @@ module "vpc_endpoints" {
   source  = "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"
   version = "5.19.0"
 
+  count = var.create_logs_endpoint ? 1 : 0
+
   vpc_id             = var.vpc_id
   subnet_ids         = [var.subnet_id]
   security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
@@ -177,9 +179,6 @@ module "vpc_endpoints" {
       tags = {
         Name = "${var.environment}-logs-interface-endpoint"
       }
-
-      count = var.create_logs_endpoint ? 1 : 0
-
     }
 
     athena = {
@@ -189,9 +188,6 @@ module "vpc_endpoints" {
       tags = {
         Name = "${var.environment}-athena-interface-endpoint"
       }
-
-      count = var.create_athena_endpoint ? 1 : 0
-
     }
 
     glue = {
@@ -201,9 +197,6 @@ module "vpc_endpoints" {
       tags = {
         Name = "${var.environment}-glue-interface-endpoint"
       }
-
-      count = var.create_glue_endpoint ? 1 : 0
-
     }
   }
 
