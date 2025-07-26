@@ -577,7 +577,7 @@ resource "aws_cloudwatch_event_rule" "ibov_scraper_schedule" {
   name                = "${var.environment}-ibov-scraper-daily-schedule"
   description         = "Agenda a execução da função Lambda de scraping do IBovespa diariamente."
   schedule_expression = "cron(0 12 * * ? *)" # Exemplo: executa a cada 1 dia. Use "cron(0 12 * * ? *)" para 12:00 UTC diariamente.
-  state          = "ENABLED"
+  state               = var.lambda_state
   tags = {
     Name = "ibov-scraper-schedule"
   }
