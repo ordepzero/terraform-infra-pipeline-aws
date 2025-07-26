@@ -193,6 +193,9 @@ resource "aws_vpc_endpoint" "athena_interface_endpoint" {
 
   subnet_ids         = [var.subnet_id]
   security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
+  tags = {
+    Name = "${var.environment}-athena-interface-endpoint"
+  }
 }
 
 resource "aws_vpc_endpoint" "glue_interface_endpoint" {
@@ -211,11 +214,11 @@ resource "aws_vpc_endpoint" "glue_interface_endpoint" {
 ###   GLUE CONNECTION   ###
 ###########################
 resource "aws_glue_connection" "glue_connection" {
-  name        = "glue_connection"
-  description = "Glue connection"
+  name        = "${var.environment}-glue-vpc-connection"
+  description = "Glue connection for ${var.environment} environment within the VPC"
   connection_type = "NETWORK" # Ou JDBC, KAFKA, MONGODB, etc.
   physical_connection_requirements {
-    availability_zone = "sa-east-1a"
+    availability_zone = data.aws_subnet.glue_job_subnet.availability_zone
     # Agora referenciamos o ID do Security Group que acabamos de criar
     security_group_id_list = [aws_security_group.glue_job_security_group.id] 
     subnet_id = var.subnet_id
@@ -303,7 +306,7 @@ resource "aws_iam_role" "glue_job_role" {
 # Adicione as políticas de permissão necessárias para a role do Glue Job
 # para acessar os buckets S3 e o CloudWatch Logs.
 resource "aws_iam_role_policy" "glue_job_s3_access" {
-  name = "glue-job-s3-access"
+  name = "${var.environment}-glue-job-s3-access"
   role = aws_iam_role.glue_job_role.id
 
   policy = jsonencode({
@@ -449,7 +452,7 @@ resource "aws_iam_role" "lambda_execution_role" {
   })
 }
 resource "aws_iam_role_policy" "lambda_s3_access" {
-  name = "lambda-s3-access"
+  name = "${var.environment}-lambda-s3-access"
   role = aws_iam_role.lambda_execution_role.id
 
   policy = jsonencode({
@@ -475,7 +478,7 @@ resource "aws_iam_role_policy" "lambda_s3_access" {
   })
 }
 resource "aws_iam_role_policy" "lambda_policy" {
-  name = "lambda-glue-trigger-policy"
+  name = "${var.environment}-lambda-glue-trigger-policy"
   role = aws_iam_role.lambda_execution_role.id
 
   policy = jsonencode({
@@ -516,7 +519,7 @@ resource "aws_iam_role_policy" "lambda_policy" {
 
 # Permissão para o S3 invocar a função Lambda
 resource "aws_lambda_permission" "allow_s3_to_call_lambda" {
-  statement_id  = "AllowS3InvokeLambda"
+  statement_id  = "${var.environment}-AllowS3InvokeLambda"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.lambda_inicia_glue_job.function_name
   principal     = "s3.amazonaws.com"
@@ -575,7 +578,7 @@ module "lambda_functions_scrapper" {
 #### Agendador (EventBridge Rule) para a função Lambda  ####
 ############################################################
 resource "aws_cloudwatch_event_rule" "ibov_scraper_schedule" {
-  name                = "ibov-scraper-daily-schedule"
+  name                = "${var.environment}-ibov-scraper-daily-schedule"
   description         = "Agenda a execução da função Lambda de scraping do IBovespa diariamente."
   schedule_expression = "cron(0 12 * * ? *)" # Exemplo: executa a cada 1 dia. Use "cron(0 12 * * ? *)" para 12:00 UTC diariamente.
   state          = "ENABLED"
@@ -586,7 +589,7 @@ resource "aws_cloudwatch_event_rule" "ibov_scraper_schedule" {
 
 # Permissão para o EventBridge invocar a função Lambda
 resource "aws_lambda_permission" "allow_cloudwatch_to_call_ibov_scraper" {
-  statement_id  = "AllowExecutionFromCloudWatch"
+  statement_id  = "${var.environment}-AllowExecutionFromCloudWatch"
   action        = "lambda:InvokeFunction"
   function_name = module.lambda_functions_scrapper.lambda_function_name
   principal     = "events.amazonaws.com"
@@ -596,7 +599,7 @@ resource "aws_lambda_permission" "allow_cloudwatch_to_call_ibov_scraper" {
 # Define o alvo do agendador (a função Lambda)
 resource "aws_cloudwatch_event_target" "ibov_scraper_target" {
   rule      = aws_cloudwatch_event_rule.ibov_scraper_schedule.name
-  target_id = "ibov-scraper-lambda-target"
+  target_id = "${var.environment}-ibov-scraper-lambda-target"
   arn       = module.lambda_functions_scrapper.lambda_function_arn
 }
 
