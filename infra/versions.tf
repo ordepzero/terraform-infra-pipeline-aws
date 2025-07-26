@@ -12,8 +12,3 @@ terraform {
 
   required_version = ">= 1.3" # Recomenda uma versão mínima do Terraform
 }
-
-# Data source para obter a região atual
-data "aws_region" "current" {}
-
-
