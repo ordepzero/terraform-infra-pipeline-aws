@@ -56,7 +56,7 @@ jobs:
           run: |
             echo "--- Running in $(pwd) ---"
             ls -la
-            terraform init -upgrade\
+            terraform init -upgrade \
               -backend-config="bucket=${{ inputs.aws-statefile-s3-bucket }}" \
               -backend-config="key=${{ github.event.repository.name }}" \
               -backend-config="region=${{ inputs.aws-region }}" \
@@ -69,7 +69,7 @@ jobs:
 
         - name: Terraform Validate
           run: |
-            echo "--- Running in $(pwd) ---
+            echo "--- Running in $(pwd) ---"
             terraform validate -no-color
           working-directory: infra
 
