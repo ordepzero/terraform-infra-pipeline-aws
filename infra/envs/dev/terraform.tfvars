@@ -14,4 +14,4 @@ subnet_id = "subnet-095b4b564407caf39"
 lambda_layer_scrapper_artefatos_arn = "arn:aws:lambda:sa-east-1:336392948345:layer:AWSSDKPandas-Python313:3"
 create_glue_endpoint = true
 create_logs_endpoint = true
-create_athena_endpoints = true
+create_athena_endpoint = true
