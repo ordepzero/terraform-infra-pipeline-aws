@@ -51,32 +51,19 @@ jobs:
           run: |
             DESTROY="$(jq -r '.${{ inputs.environment }}' ./infra/destroy_config.json)"
             echo "destroy=$(echo $DESTROY)" >> $GITHUB_OUTPUT
-            
-        - name: Clean Terraform state
+
+        - name: Terraform Init and Validate
           run: |
-            echo "Forcing a clean state by removing .terraform directory and .terraform.lock.hcl"
+            echo "--- Cleaning, Initializing, and Validating in a single step ---"
             rm -rf .terraform
             rm -f .terraform.lock.hcl
-          working-directory: infra
-
-        - name: Terraform Init
-          run: |
-            echo "--- Running in $(pwd) ---"
-            ls -la
+            echo "--- Initializing Terraform ---"
             terraform init -upgrade \
               -backend-config="bucket=${{ inputs.aws-statefile-s3-bucket }}" \
               -backend-config="key=${{ github.event.repository.name }}" \
               -backend-config="region=${{ inputs.aws-region }}" \
               -backend-config="dynamodb_table=${{ inputs.aws-lock-dynamodb-table }}"
-            echo "--- Provider version after init ---"
-            terraform version
-            echo "--- List downloaded providers ---"
-            ls -R .terraform/providers
-          working-directory: infra
-
-        - name: Terraform Validate
-          run: |
-            echo "--- Running in $(pwd) ---"
+            echo "--- Validating configuration ---"
             terraform validate -no-color
           working-directory: infra
 
