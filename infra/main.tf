@@ -152,74 +152,56 @@ data "aws_route_table" "glue_job_subnet_route_table" {
   }
 }
 
-data "aws_vpc_endpoint" "all_endpoints" {
-  filter {
-    name   = "vpc-id"
-    values = ["vpc-03cb423171b0bf0e1"]
-  }
-}
+module "vpc_endpoints" {
+  source  = "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"
+  version = "5.19.0"
 
-output "vpc_endpoint_ids" {
-  value = data.aws_vpc_endpoint.all_endpoints.id
-}
-
-
-# NOVO: VPC Endpoint de Gateway para S3
-# Permite que o Glue Job acesse o S3 de dentro da VPC sem precisar de NAT Gateway ou Internet Gateway.
-resource "aws_vpc_endpoint" "s3_gateway_endpoint" {
-  vpc_id       = var.vpc_id
-  service_name = "com.amazonaws.${data.aws_region.current.region}.s3"
-  vpc_endpoint_type = "Gateway" # Tipo Gateway para S3
-
-  # Associa o endpoint à tabela de rotas da sub-rede do Glue Job
-  route_table_ids = [data.aws_route_table.glue_job_subnet_route_table.id]
-
-  tags = {
-    Name = "${var.environment}-s3-gateway-endpoint"
-  }
-}
-
-# NOVO: VPC Endpoint de Interface para CloudWatch Logs
-# Permite que o Glue Job envie logs de dentro da VPC.
-resource "aws_vpc_endpoint" "logs_interface_endpoint" {
-  vpc_id            = var.vpc_id
-  service_name      = "com.amazonaws.${data.aws_region.current.region}.logs"
-  vpc_endpoint_type = "Interface"
-  private_dns_enabled = true
-
+  vpc_id             = var.vpc_id
   subnet_ids         = [var.subnet_id]
   security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
 
-  tags = {
-    Name = "${var.environment}-logs-interface-endpoint"
+  endpoints = {
+    s3 = {
+      service             = "s3"
+      vpc_endpoint_type   = "Gateway"
+      route_table_ids     = [data.aws_route_table.glue_job_subnet_route_table.id]
+      tags = {
+        Name = "${var.environment}-s3-gateway-endpoint"
+      }
+    }
+
+    logs = {
+      service               = "logs"
+      vpc_endpoint_type     = "Interface"
+      private_dns_enabled   = true
+      tags = {
+        Name = "${var.environment}-logs-interface-endpoint"
+      }
+    }
+
+    athena = {
+      service               = "athena"
+      vpc_endpoint_type     = "Interface"
+      private_dns_enabled   = true
+      tags = {
+        Name = "${var.environment}-athena-interface-endpoint"
+      }
+    }
+
+    glue = {
+      service               = "glue"
+      vpc_endpoint_type     = "Interface"
+      private_dns_enabled   = true
+      tags = {
+        Name = "${var.environment}-glue-interface-endpoint"
+      }
+    }
   }
-}
 
-# NOVO: VPC Endpoint de Gateway para Athena
-# Permite que o Glue Job execute queries no Athena de dentro da VPC.
-resource "aws_vpc_endpoint" "athena_interface_endpoint" {
-  vpc_id            = var.vpc_id
-  service_name      = "com.amazonaws.${data.aws_region.current.region}.athena"
-  vpc_endpoint_type = "Interface"
-  private_dns_enabled = true
-
-  subnet_ids         = [var.subnet_id]
-  security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
   tags = {
-    Name = "${var.environment}-athena-interface-endpoint"
+    Environment = var.environment
+    Owner       = "DataPlatform"
   }
-}
-
-resource "aws_vpc_endpoint" "glue_interface_endpoint" {
-  vpc_id            = var.vpc_id
-  service_name      = "com.amazonaws.${data.aws_region.current.region}.glue"
-  vpc_endpoint_type = "Interface"
-  private_dns_enabled = true
-
-  subnet_ids         = [var.subnet_id]
-  security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
-
-  tags = { Name = "${var.environment}-glue-interface-endpoint" }
 }
 
 ###########################
