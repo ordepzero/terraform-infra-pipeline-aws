@@ -160,7 +160,7 @@ data "aws_vpc_endpoint" "all_endpoints" {
 }
 
 output "vpc_endpoint_ids" {
-  value = data.aws_vpc_endpoints.all_endpoints.ids
+  value = data.aws_vpc_endpoint.all_endpoints.ids
 }
 
 
