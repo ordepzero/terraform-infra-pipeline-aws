@@ -158,7 +158,7 @@ data "aws_route_table" "glue_job_subnet_route_table" {
 # ao aplicar o Terraform em ambientes onde os endpoints já podem ter sido criados.
 
 # 1. S3 Gateway Endpoint
-data "aws_vpc_endpoints" "s3_gateway_existing" {
+data "aws_vpc_endpoint" "s3_gateway_existing" {
   filter {
     name   = "vpc-id"
     values = [var.vpc_id]
@@ -175,7 +175,7 @@ data "aws_vpc_endpoints" "s3_gateway_existing" {
 
 resource "aws_vpc_endpoint" "s3_gateway_endpoint" {
   # Cria o recurso apenas se o data source acima não encontrar nenhum endpoint existente.
-  count = length(data.aws_vpc_endpoints.s3_gateway_existing.ids) == 0 ? 1 : 0
+  count = length(data.aws_vpc_endpoint.s3_gateway_existing.ids) == 0 ? 1 : 0
 
   vpc_id            = var.vpc_id
   service_name      = "com.amazonaws.${data.aws_region.current.region}.s3"
@@ -187,7 +187,7 @@ resource "aws_vpc_endpoint" "s3_gateway_endpoint" {
 }
 
 # 2. CloudWatch Logs Interface Endpoint
-data "aws_vpc_endpoints" "logs_interface_existing" {
+data "aws_vpc_endpoint" "logs_interface_existing" {
   filter {
     name   = "vpc-id"
     values = [var.vpc_id]
@@ -199,7 +199,7 @@ data "aws_vpc_endpoints" "logs_interface_existing" {
 }
 
 resource "aws_vpc_endpoint" "logs_interface_endpoint" {
-  count = length(data.aws_vpc_endpoints.logs_interface_existing.ids) == 0 ? 1 : 0
+  count = length(data.aws_vpc_endpoint.logs_interface_existing.ids) == 0 ? 1 : 0
 
   vpc_id              = var.vpc_id
   service_name        = "com.amazonaws.${data.aws_region.current.region}.logs"
@@ -213,7 +213,7 @@ resource "aws_vpc_endpoint" "logs_interface_endpoint" {
 }
 
 # 3. Athena Interface Endpoint
-data "aws_vpc_endpoints" "athena_interface_existing" {
+data "aws_vpc_endpoint" "athena_interface_existing" {
   filter {
     name   = "vpc-id"
     values = [var.vpc_id]
@@ -225,7 +225,7 @@ data "aws_vpc_endpoints" "athena_interface_existing" {
 }
 
 resource "aws_vpc_endpoint" "athena_interface_endpoint" {
-  count = length(data.aws_vpc_endpoints.athena_interface_existing.ids) == 0 ? 1 : 0
+  count = length(data.aws_vpc_endpoint.athena_interface_existing.ids) == 0 ? 1 : 0
 
   vpc_id              = var.vpc_id
   service_name        = "com.amazonaws.${data.aws_region.current.region}.athena"
@@ -239,7 +239,7 @@ resource "aws_vpc_endpoint" "athena_interface_endpoint" {
 }
 
 # 4. Glue Interface Endpoint
-data "aws_vpc_endpoints" "glue_interface_existing" {
+data "aws_vpc_endpoint" "glue_interface_existing" {
   filter {
     name   = "vpc-id"
     values = [var.vpc_id]
@@ -251,7 +251,7 @@ data "aws_vpc_endpoints" "glue_interface_existing" {
 }
 
 resource "aws_vpc_endpoint" "glue_interface_endpoint" {
-  count = length(data.aws_vpc_endpoints.glue_interface_existing.ids) == 0 ? 1 : 0
+  count = length(data.aws_vpc_endpoint.glue_interface_existing.ids) == 0 ? 1 : 0
 
   vpc_id              = var.vpc_id
   service_name        = "com.amazonaws.${data.aws_region.current.region}.glue"
