@@ -152,6 +152,18 @@ data "aws_route_table" "glue_job_subnet_route_table" {
   }
 }
 
+data "aws_vpc_endpoints" "all_endpoints" {
+  filter {
+    name   = "vpc-id"
+    values = ["vpc-03cb423171b0bf0e1"]
+  }
+}
+
+output "vpc_endpoint_ids" {
+  value = data.aws_vpc_endpoints.all_endpoints.ids
+}
+
+
 # NOVO: VPC Endpoint de Gateway para S3
 # Permite que o Glue Job acesse o S3 de dentro da VPC sem precisar de NAT Gateway ou Internet Gateway.
 resource "aws_vpc_endpoint" "s3_gateway_endpoint" {
