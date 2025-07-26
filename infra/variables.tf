@@ -80,3 +80,7 @@ variable "create_logs_endpoint" {
 variable "create_athena_endpoint" {
   type    = bool
 }
+
+variable "lambda_state" {
+  type = string
+}
