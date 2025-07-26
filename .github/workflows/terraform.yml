@@ -54,15 +54,22 @@ jobs:
 
         - name: Terraform Init
           run: |
+            echo "--- Running in $(pwd) ---"
+            ls -la
             terraform init -upgrade\
               -backend-config="bucket=${{ inputs.aws-statefile-s3-bucket }}" \
               -backend-config="key=${{ github.event.repository.name }}" \
               -backend-config="region=${{ inputs.aws-region }}" \
               -backend-config="dynamodb_table=${{ inputs.aws-lock-dynamodb-table }}"
+            echo "--- Provider version after init ---"
+            terraform version
+            echo "--- List downloaded providers ---"
+            ls -R .terraform/providers
           working-directory: infra
-          
+
         - name: Terraform Validate
           run: |
+            echo "--- Running in $(pwd) ---
             terraform validate -no-color
           working-directory: infra
 
@@ -70,6 +77,7 @@ jobs:
           if: steps.read-destroy-config.outputs.destroy == 'true'
           id: terraform-destroy
           run: |
+            echo "--- Running in $(pwd) ---"
             terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
             terraform destroy -var-file="./envs/${{ inputs.environment }}/terraform.tfvars" -auto-approve
           working-directory: infra
@@ -78,6 +86,7 @@ jobs:
           if: steps.read-destroy-config.outputs.destroy != 'true'
           id: terraform-plan
           run: |
+            echo "--- Running in $(pwd) ---"
             terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
             terraform plan -var-file="./envs/${{ inputs.environment }}/terraform.tfvars" -out="${{ inputs.environment  }}.plan"
           working-directory: infra
@@ -86,6 +95,7 @@ jobs:
           if: steps.read-destroy-config.outputs.destroy != 'true'
           id: terraform-apply
           run: |
+            echo "--- Running in $(pwd) ---"
             terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
             terraform apply "${{ inputs.environment  }}.plan"
           working-directory: infra
