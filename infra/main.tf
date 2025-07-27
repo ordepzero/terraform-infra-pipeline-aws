@@ -78,16 +78,6 @@ resource "aws_security_group_rule" "glue_self_ingress_all" {
   description       = "Required for AWS Glue internal communication within VPC"
 }
 
-resource "aws_security_group_rule" "endpoints_ingress_from_glue_job" {
-  type                     = "ingress"
-  from_port                = 443
-  to_port                  = 443
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.vpc_endpoints_sg.id
-  source_security_group_id = aws_security_group.glue_job_security_group.id
-  description              = "Allow HTTPS from Glue Job"
-}
-
 
 # Regra de SAÍDA para o SG do Glue Job: Permite DNS. Necessário para resolver nomes de endpoints.
 resource "aws_security_group_rule" "glue_job_egress_dns" {
