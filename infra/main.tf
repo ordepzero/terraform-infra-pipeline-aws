@@ -123,18 +123,11 @@ resource "aws_security_group" "vpc_endpoints_sg" {
   }
 }
 
-# --- Referenciando Recursos de Rede Existentes ---
-# Usamos data sources para que o Terraform conheça os recursos existentes sem tentar criá-los.
+# --- Configuração de Rede para o Glue Job ---
 
-data "aws_vpc_endpoint" "s3_existing" {
-  vpc_id       = var.vpc_id
-  service_name = "com.amazonaws.${data.aws_region.current.region}.s3"
-}
-
+# Busca a tabela de rotas que a sub-rede do Glue está usando.
+# Com base no erro anterior, sabemos que é a tabela principal da VPC.
 data "aws_route_table" "glue_job_subnet_route_table" {
-  # A tabela de rotas que a sub-rede do Glue está usando.
-  # Substitua pelo ID correto se não for a tabela principal.
-  # Neste caso, vamos assumir que é a principal, como no erro anterior.
   vpc_id = var.vpc_id
   filter {
     name   = "association.main"
@@ -142,13 +135,15 @@ data "aws_route_table" "glue_job_subnet_route_table" {
   }
 }
 
-# --- Associação da Rota do S3 ---
-# Este recurso é a chave para resolver o erro do Glue Job.
-# Ele garante que a tabela de rotas da sua sub-rede tenha uma rota para o S3
-# através do seu endpoint S3 existente.
-resource "aws_vpc_endpoint_route_table_association" "s3_route" {
-  vpc_endpoint_id = data.aws_vpc_endpoint.s3_existing.id
-  route_table_id  = data.aws_route_table.glue_job_subnet_route_table.id
+# --- Criação do S3 Gateway Endpoint ---
+# Este recurso é essencial para que o Glue Job possa acessar o S3 a partir da VPC.
+# Ele cria o endpoint do tipo 'Gateway' e o associa à tabela de rotas da sub-rede.
+resource "aws_vpc_endpoint" "s3_gateway" {
+  vpc_id            = var.vpc_id
+  service_name      = "com.amazonaws.${data.aws_region.current.region}.s3"
+  vpc_endpoint_type = "Gateway"
+  route_table_ids   = [data.aws_route_table.glue_job_subnet_route_table.id]
+  tags              = { Name = "${var.environment}-s3-gateway-endpoint" }
 }
 
 ###########################
