@@ -87,6 +87,12 @@ variable "create_athena_endpoint" {
   default     = true
 }
 
+variable "create_s3_endpoint" {
+  description = "Set to true to create the S3 VPC endpoint, false to skip."
+  type        = bool
+  default     = true
+}
+
 variable "lambda_state" {
   type = string
 }

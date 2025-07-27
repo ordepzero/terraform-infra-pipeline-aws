@@ -134,11 +134,11 @@ data "aws_subnet" "glue_job_subnet" {
 # Data source para obter a tabela de rotas da sub-rede do Glue Job
 # Isso é necessário para associar o VPC Endpoint S3 à tabela de rotas correta.
 data "aws_route_table" "glue_job_subnet_route_table" {
-  # Filtra a tabela de rotas que está DIRETAMENTE associada à sub-rede do Glue.
-  # Isso é mais robusto do que assumir que a sub-rede usa a tabela de rotas principal.
+  # Busca a tabela de rotas principal da VPC, que é usada pela sub-rede quando não há uma associação explícita.
+  vpc_id = data.aws_subnet.glue_job_subnet.vpc_id
   filter {
-    name   = "association.subnet-id"
-    values = [data.aws_subnet.glue_job_subnet.id]
+    name   = "association.main"
+    values = ["true"]
   }
 }
 
@@ -172,11 +172,8 @@ locals {
   # Constrói o mapa final de endpoints a serem criados, usando as variáveis booleanas como interruptores.
   # A função merge() combina os mapas, e o operador ternário (?) retorna um mapa vazio se a variável for false.
   endpoints_to_create = merge(
-    # O endpoint S3 é essencial para o Glue e deve ser sempre criado se não existir.
-    # Para simplificar, vamos assumir que ele sempre deve ser gerenciado pelo Terraform.
-    { "s3" = local.s3_endpoint_config },
-
-    # Os outros endpoints são criados condicionalmente.
+    # Todos os endpoints agora são criados condicionalmente com base em suas respectivas variáveis.
+    var.create_s3_endpoint ? { "s3" = local.s3_endpoint_config } : {},
     var.create_logs_endpoint ? { "logs" = local.logs_endpoint_config } : {},
     var.create_athena_endpoint ? { "athena" = local.athena_endpoint_config } : {},
     var.create_glue_endpoint ? { "glue" = local.glue_endpoint_config } : {}
