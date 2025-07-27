@@ -113,14 +113,24 @@ resource "aws_security_group_rule" "glue_egress_all" {
 }
 
 
-resource "aws_security_group" "vpc_endpoints_sg" {
-  name        = "${var.environment}-vpc-endpoints-sg"
-  description = "Security group for VPC Interface Endpoints"
-  vpc_id      = var.vpc_id
+# --- Referenciando o Security Group dos Endpoints Existentes ---
+# Em vez de criar um novo SG, usamos um data source para encontrar o que já existe.
+# Certifique-se de que o nome "${var.environment}-vpc-endpoints-sg" corresponde ao nome do SG
+# que está atualmente associado aos seus VPC Endpoints (vpce-08e4b967bd3862dab, etc.).
+data "aws_security_group" "vpc_endpoints_sg_existing" {
+  name   = "${var.environment}-vpc-endpoints-sg"
+  vpc_id = var.vpc_id
+}
 
-  tags = {
-    Name = "${var.environment}-vpc-endpoints-sg"
-  }
+# A regra de permissão agora é adicionada ao SG existente encontrado acima.
+resource "aws_security_group_rule" "endpoints_ingress_from_glue_job" {
+  type                     = "ingress"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  security_group_id        = data.aws_security_group.vpc_endpoints_sg_existing.id
+  source_security_group_id = aws_security_group.glue_job_security_group.id
+  description              = "Allow HTTPS from Glue Job"
 }
 
 # --- Configuração de Rede para o Glue Job ---
