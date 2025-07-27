@@ -123,15 +123,6 @@ resource "aws_security_group" "vpc_endpoints_sg" {
   }
 }
 
-resource "aws_security_group_rule" "glue_job_egress_to_endpoints" {
-  type              = "egress"
-  from_port         = 443
-  to_port           = 443
-  protocol          = "tcp"
-  security_group_id = aws_security_group.vpc_endpoints_sg.id 
-  source_security_group_id = aws_security_group.vpc_endpoints_sg.id  # Corrected
-}
-
 #################################
 #### ROUTE TABLE ASSOCIATION ####
 #################################
@@ -143,62 +134,67 @@ data "aws_subnet" "glue_job_subnet" {
 # Data source para obter a tabela de rotas da sub-rede do Glue Job
 # Isso é necessário para associar o VPC Endpoint S3 à tabela de rotas correta.
 data "aws_route_table" "glue_job_subnet_route_table" {
-  vpc_id = data.aws_subnet.glue_job_subnet.vpc_id
-
-  # Removendo o filtro "association.subnet-id" para focar na "main".
+  # Filtra a tabela de rotas que está DIRETAMENTE associada à sub-rede do Glue.
+  # Isso é mais robusto do que assumir que a sub-rede usa a tabela de rotas principal.
   filter {
-    name   = "association.main"
-    values = ["true"]
+    name   = "association.subnet-id"
+    values = [data.aws_subnet.glue_job_subnet.id]
   }
+}
+
+locals {
+  # Define a configuração para cada endpoint que pode ser criado.
+  s3_endpoint_config = {
+    service           = "s3"
+    vpc_endpoint_type = "Gateway"
+    route_table_ids   = [data.aws_route_table.glue_job_subnet_route_table.id]
+    tags              = { Name = "${var.environment}-s3-gateway-endpoint" }
+  }
+
+  logs_endpoint_config = {
+    service             = "logs"
+    private_dns_enabled = true
+    tags                = { Name = "${var.environment}-logs-interface-endpoint" }
+  }
+
+  athena_endpoint_config = {
+    service             = "athena"
+    private_dns_enabled = true
+    tags                = { Name = "${var.environment}-athena-interface-endpoint" }
+  }
+
+  glue_endpoint_config = {
+    service             = "glue"
+    private_dns_enabled = true
+    tags                = { Name = "${var.environment}-glue-interface-endpoint" }
+  }
+
+  # Constrói o mapa final de endpoints a serem criados, usando as variáveis booleanas como interruptores.
+  # A função merge() combina os mapas, e o operador ternário (?) retorna um mapa vazio se a variável for false.
+  endpoints_to_create = merge(
+    # O endpoint S3 é essencial para o Glue e deve ser sempre criado se não existir.
+    # Para simplificar, vamos assumir que ele sempre deve ser gerenciado pelo Terraform.
+    { "s3" = local.s3_endpoint_config },
+
+    # Os outros endpoints são criados condicionalmente.
+    var.create_logs_endpoint ? { "logs" = local.logs_endpoint_config } : {},
+    var.create_athena_endpoint ? { "athena" = local.athena_endpoint_config } : {},
+    var.create_glue_endpoint ? { "glue" = local.glue_endpoint_config } : {}
+  )
 }
 
 module "vpc_endpoints" {
   source  = "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"
   version = "5.19.0"
 
-  count = var.create_logs_endpoint ? 1 : 0
-
+  # O módulo agora é sempre "criado", mas o mapa de endpoints que ele recebe é dinâmico.
   vpc_id             = var.vpc_id
   subnet_ids         = [var.subnet_id]
   security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
 
-  endpoints = {
-    s3 = {
-      service             = "s3"
-      vpc_endpoint_type   = "Gateway"
-      route_table_ids     = [data.aws_route_table.glue_job_subnet_route_table.id]
-      tags = {
-        Name = "${var.environment}-s3-gateway-endpoint"
-      }
-    }
-
-    logs = {
-      service               = "logs"
-      vpc_endpoint_type     = "Interface"
-      private_dns_enabled   = true
-      tags = {
-        Name = "${var.environment}-logs-interface-endpoint"
-      }
-    }
-
-    athena = {
-      service               = "athena"
-      vpc_endpoint_type     = "Interface"
-      private_dns_enabled   = true
-      tags = {
-        Name = "${var.environment}-athena-interface-endpoint"
-      }
-    }
-
-    glue = {
-      service               = "glue"
-      vpc_endpoint_type     = "Interface"
-      private_dns_enabled   = true
-      tags = {
-        Name = "${var.environment}-glue-interface-endpoint"
-      }
-    }
-  }
+  # Passa o mapa de endpoints construído dinamicamente para o módulo.
+  # Se um endpoint não deve ser criado (variável=false), ele não estará neste mapa, e o módulo não tentará criá-lo.
+  endpoints = local.endpoints_to_create
 
   tags = {
     Environment = var.environment

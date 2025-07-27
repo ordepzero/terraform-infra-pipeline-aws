@@ -70,15 +70,21 @@ variable "subnet_id" {
 }
 
 variable "create_glue_endpoint" {
-  type    = bool
+  description = "Set to true to create the Glue VPC endpoint, false to skip."
+  type        = bool
+  default     = true
 }
 
 variable "create_logs_endpoint" {
-  type    = bool
+  description = "Set to true to create the CloudWatch Logs VPC endpoint, false to skip."
+  type        = bool
+  default     = true
 }
 
 variable "create_athena_endpoint" {
-  type    = bool
+  description = "Set to true to create the Athena VPC endpoint, false to skip."
+  type        = bool
+  default     = true
 }
 
 variable "lambda_state" {
