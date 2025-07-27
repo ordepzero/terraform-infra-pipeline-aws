@@ -1,0 +1,23 @@
+FIAP PosTech - Especialização Machine Learning Engineering
+Tech Challenge 02
+Junho a Julho de 2025
+--
+Grupo F-61:
+Ana Paula de Almeida            RM 363602
+Augusto do Nascimento Omena     RM 363185
+Bruno Gabriel de Oliveira       RM 361248
+José Walmir Gonçalves Duque     RM 363196
+Pedro Henrique da Costa Ulisses RM 360864
+
+
+Entregáveis:
+
+Link do Repositório do GitHub:
+https://github.com/ordepzero/terraform-infra-pipeline-aws
+
+
+Link com Diagrama de Arquitetura do Sistema:
+(atualizar)
+
+Link do Vídeo no Youtube:
+(atualizar)
