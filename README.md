@@ -129,13 +129,13 @@ Em face ao desafio proposto, segue detalhes da solução:
     *   A lambda invocada inicia o processamento do Glue Job.
     *   O glue job realiza as seguintes operações:
         *   Leitura do arquivo parquet com dados brutos.
-        *   Realiza conversão dos dados numéricos da nomenclatura BR para universal.
+        *   Realiza conversão dos dados numéricos da nomenclatura BR para UI.
         *   Renomeia as colunas e carrega os dados na tabela de resultados refinados.
         *   Disponibiliza os dados via Athena.
 5.  **Realização de análises de dados refinados**
     *   Extração dos dados refinados e cópia para o Google Colab para realização das seguintes operações:
         *   Agregação: total de negociações por ação.
-        *   Cálculo temporal: diferença entre data do pregão e data de liquidação, ou conversão de string para tipo timestamp.
+        *   Cálculo temporal: análise de partição em cada ação.
 
 
 ## Vídeo de Apresentação no Youtube
