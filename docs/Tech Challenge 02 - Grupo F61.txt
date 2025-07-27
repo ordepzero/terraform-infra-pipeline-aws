@@ -17,7 +17,7 @@ https://github.com/ordepzero/terraform-infra-pipeline-aws
 
 
 Link com Diagrama de Arquitetura do Sistema:
-(atualizar)
+https://github.com/ordepzero/terraform-infra-pipeline-aws/blob/main/docs/imagens/Tech_Challenge_01_-_Arquitetura_de_Solucao.png
 
 Link do Vídeo no Youtube:
 (atualizar)
