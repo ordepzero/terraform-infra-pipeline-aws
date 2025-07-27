@@ -13,7 +13,3 @@ glue_job_data_prep = "prod-fiap-tc02-glue-job-data-prep"
 vpc_id = "vpc-03cb423171b0bf0e1"
 subnet_id = "subnet-095b4b564407caf39"
 lambda_layer_scrapper_artefatos_arn = "arn:aws:lambda:sa-east-1:336392948345:layer:AWSSDKPandas-Python313:3"
-create_s3_endpoint     = false
-create_logs_endpoint   = false
-create_athena_endpoint = false
-create_glue_endpoint   = false

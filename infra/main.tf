@@ -123,80 +123,32 @@ resource "aws_security_group" "vpc_endpoints_sg" {
   }
 }
 
-#################################
-#### ROUTE TABLE ASSOCIATION ####
-#################################
+# --- Referenciando Recursos de Rede Existentes ---
+# Usamos data sources para que o Terraform conheça os recursos existentes sem tentar criá-los.
 
-data "aws_subnet" "glue_job_subnet" {
-  id = var.subnet_id
+data "aws_vpc_endpoint" "s3_existing" {
+  vpc_id       = var.vpc_id
+  service_name = "com.amazonaws.${data.aws_region.current.region}.s3"
 }
 
-# Data source para obter a tabela de rotas da sub-rede do Glue Job
-# Isso é necessário para associar o VPC Endpoint S3 à tabela de rotas correta.
 data "aws_route_table" "glue_job_subnet_route_table" {
-  # Busca a tabela de rotas principal da VPC, que é usada pela sub-rede quando não há uma associação explícita.
-  vpc_id = data.aws_subnet.glue_job_subnet.vpc_id
+  # A tabela de rotas que a sub-rede do Glue está usando.
+  # Substitua pelo ID correto se não for a tabela principal.
+  # Neste caso, vamos assumir que é a principal, como no erro anterior.
+  vpc_id = var.vpc_id
   filter {
     name   = "association.main"
     values = ["true"]
   }
 }
 
-locals {
-  # Define a configuração para cada endpoint que pode ser criado.
-  s3_endpoint_config = {
-    service           = "s3"
-    vpc_endpoint_type = "Gateway"
-    route_table_ids   = [data.aws_route_table.glue_job_subnet_route_table.id]
-    tags              = { Name = "${var.environment}-s3-gateway-endpoint" }
-  }
-
-  logs_endpoint_config = {
-    service             = "logs"
-    private_dns_enabled = true
-    tags                = { Name = "${var.environment}-logs-interface-endpoint" }
-  }
-
-  athena_endpoint_config = {
-    service             = "athena"
-    private_dns_enabled = true
-    tags                = { Name = "${var.environment}-athena-interface-endpoint" }
-  }
-
-  glue_endpoint_config = {
-    service             = "glue"
-    private_dns_enabled = true
-    tags                = { Name = "${var.environment}-glue-interface-endpoint" }
-  }
-
-  # Constrói o mapa final de endpoints a serem criados, usando as variáveis booleanas como interruptores.
-  # A função merge() combina os mapas, e o operador ternário (?) retorna um mapa vazio se a variável for false.
-  endpoints_to_create = merge(
-    # Todos os endpoints agora são criados condicionalmente com base em suas respectivas variáveis.
-    var.create_s3_endpoint ? { "s3" = local.s3_endpoint_config } : {},
-    var.create_logs_endpoint ? { "logs" = local.logs_endpoint_config } : {},
-    var.create_athena_endpoint ? { "athena" = local.athena_endpoint_config } : {},
-    var.create_glue_endpoint ? { "glue" = local.glue_endpoint_config } : {}
-  )
-}
-
-module "vpc_endpoints" {
-  source  = "terraform-aws-modules/vpc/aws//modules/vpc-endpoints"
-  version = "5.19.0"
-
-  # O módulo agora é sempre "criado", mas o mapa de endpoints que ele recebe é dinâmico.
-  vpc_id             = var.vpc_id
-  subnet_ids         = [var.subnet_id]
-  security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
-
-  # Passa o mapa de endpoints construído dinamicamente para o módulo.
-  # Se um endpoint não deve ser criado (variável=false), ele não estará neste mapa, e o módulo não tentará criá-lo.
-  endpoints = local.endpoints_to_create
-
-  tags = {
-    Environment = var.environment
-    Owner       = "DataPlatform"
-  }
+# --- Associação da Rota do S3 ---
+# Este recurso é a chave para resolver o erro do Glue Job.
+# Ele garante que a tabela de rotas da sua sub-rede tenha uma rota para o S3
+# através do seu endpoint S3 existente.
+resource "aws_vpc_endpoint_route_table_association" "s3_route" {
+  vpc_endpoint_id = data.aws_vpc_endpoint.s3_existing.id
+  route_table_id  = data.aws_route_table.glue_job_subnet_route_table.id
 }
 
 ###########################
@@ -206,6 +158,8 @@ resource "aws_glue_connection" "glue_connection" {
   name        = "${var.environment}-glue-vpc-connection"
   description = "Glue connection for ${var.environment} environment within the VPC"
   connection_type = "NETWORK" # Ou JDBC, KAFKA, MONGODB, etc.
+
+  # O Glue precisa saber sobre a sub-rede e o security group para se conectar à VPC.
   physical_connection_requirements {
     availability_zone = data.aws_subnet.glue_job_subnet.availability_zone
     # Agora referenciamos o ID do Security Group que acabamos de criar
@@ -215,6 +169,10 @@ resource "aws_glue_connection" "glue_connection" {
 }
 
 # Data source para obter a VPC
+data "aws_subnet" "glue_job_subnet" {
+  id = var.subnet_id
+}
+
 data "aws_vpc" "default" {
   id = var.vpc_id
 }
