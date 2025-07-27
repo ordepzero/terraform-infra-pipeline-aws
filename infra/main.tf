@@ -108,8 +108,7 @@ resource "aws_security_group_rule" "glue_egress_all" {
 # Certifique-se de que o nome "${var.environment}-vpc-endpoints-sg" corresponde ao nome do SG
 # que está atualmente associado aos seus VPC Endpoints (vpce-08e4b967bd3862dab, etc.).
 data "aws_security_group" "vpc_endpoints_sg_existing" {
-  name   = "${var.environment}-vpc-endpoints-sg"
-  vpc_id = var.vpc_id
+  id = var.vpc_endpoints_sg_id
 }
 
 # A regra de permissão agora é adicionada ao SG existente encontrado acima.
@@ -308,39 +307,27 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
           "ec2:DescribeNetworkInterfaces",
           "ec2:DescribeSubnets",
           "ec2:DescribeSecurityGroups",
-          "ec2:DescribeVpcs",
-          "ec2:DescribeRouteTables",
-          "ec2:DescribeVpcEndpoints",
-          "ec2:Describe*",
-          "ec2:CreateTags"
+          "ec2:DescribeVpcEndpoints"
         ]
         Resource = "*"
       },
       {
         Effect = "Allow"
         Action = [
-            "athena:StartQueryExecution",
-            "athena:GetQueryExecution"
+          "athena:StartQueryExecution",
+          "athena:GetQueryExecution"
         ]
         Resource = [
-            "arn:aws:athena:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workgroup/primary"
-            ]
+          "arn:aws:athena:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:workgroup/primary"
+        ]
       },
       {
-        Effect = "Allow",
-        Action = [
-          "cloudwatch:PutMetricData",
-          "logs:CreateLogGroup",
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "s3:PutObject",
-          "s3:GetObject",
-          "s3:ListBucket",
-          "s3:DeleteObject"
-        ],
-        # A permissão para métricas não é vinculada a um recurso específico
-        Resource = "*"
+        "Effect": "Allow",
+        "Action": "cloudwatch:PutMetricData",
+        "Resource": "*",
+        "Condition": {
+          "StringEquals": { "cloudwatch:namespace": "AWS/Glue" }
+        }
       }
       ]
   })
