@@ -307,7 +307,8 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
           "ec2:DescribeNetworkInterfaces",
           "ec2:DescribeSubnets",
           "ec2:DescribeSecurityGroups",
-          "ec2:DescribeVpcEndpoints"
+          "ec2:DescribeVpcEndpoints",
+          "ec2:DescribeRouteTables" # Permissão necessária para o Glue validar a rota do S3 Endpoint.
         ]
         Resource = "*"
       },
