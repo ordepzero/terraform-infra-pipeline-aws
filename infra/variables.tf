@@ -69,11 +69,6 @@ variable "subnet_id" {
   type        = string
 }
 
-variable "vpc_endpoints_sg_id" {
-  description = "The ID of the existing security group associated with the VPC endpoints."
-  type        = string
-}
-
 
 variable "lambda_state" {
   type = string
