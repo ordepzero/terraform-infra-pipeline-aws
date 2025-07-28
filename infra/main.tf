@@ -103,24 +103,20 @@ resource "aws_security_group_rule" "glue_egress_all" {
 }
 
 
-# --- Security Group para os VPC Endpoints ---
-# Criamos um SG dedicado para os endpoints de interface.
-resource "aws_security_group" "vpc_endpoints_sg" {
-  name        = "${var.environment}-vpc-endpoints-sg"
-  description = "Security group for VPC Interface Endpoints"
-  vpc_id      = var.vpc_id
-  tags = {
-    Name = "${var.environment}-vpc-endpoints-sg"
-  }
+# --- Configuração de Rede para Recursos Existentes ---
+
+# 1. Referencia o Security Group existente dos endpoints usando o ID fornecido.
+data "aws_security_group" "vpc_endpoints_sg_existing" {
+  id = var.vpc_endpoints_sg_id
 }
 
-# Adiciona a regra de permissão ao SG dos endpoints, permitindo tráfego do Glue Job.
+# 2. Adiciona a regra de permissão necessária ao SG existente.
 resource "aws_security_group_rule" "endpoints_ingress_from_glue_job" {
   type                     = "ingress"
   from_port                = 443
   to_port                  = 443
   protocol                 = "tcp"
-  security_group_id        = aws_security_group.vpc_endpoints_sg.id
+  security_group_id        = data.aws_security_group.vpc_endpoints_sg_existing.id
   source_security_group_id = aws_security_group.glue_job_security_group.id
   description              = "Allow HTTPS from Glue Job"
 }
@@ -137,57 +133,18 @@ data "aws_route_table" "glue_job_subnet_route_table" {
   }
 }
 
-# --- Criação do S3 Gateway Endpoint ---
-# Este recurso é essencial para que o Glue Job possa acessar o S3 a partir da VPC.
-# Ele cria o endpoint do tipo 'Gateway' e o associa à tabela de rotas da sub-rede.
-resource "aws_vpc_endpoint" "s3_gateway" {
+# 3. Referencia o S3 Gateway Endpoint existente.
+data "aws_vpc_endpoint" "s3_gateway_existing" {
   vpc_id            = var.vpc_id
   service_name      = "com.amazonaws.${data.aws_region.current.region}.s3"
   vpc_endpoint_type = "Gateway"
-  route_table_ids   = [data.aws_route_table.glue_job_subnet_route_table.id]
-  tags              = { Name = "${var.environment}-s3-gateway-endpoint" }
 }
 
-# --- Criação dos VPC Interface Endpoints ---
-# Essenciais para que o Glue Job possa se comunicar com outros serviços AWS
-# (Logs, Glue API, Athena) de dentro da VPC, sem precisar de acesso à internet.
-
-resource "aws_vpc_endpoint" "logs_interface" {
-  vpc_id              = var.vpc_id
-  service_name        = "com.amazonaws.${data.aws_region.current.region}.logs"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-
-  subnet_ids         = [var.subnet_id]
-  security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
-
-  tags = {
-    Name = "${var.environment}-logs-interface-endpoint"
-  }
-}
-
-resource "aws_vpc_endpoint" "glue_interface" {
-  vpc_id              = var.vpc_id
-  service_name        = "com.amazonaws.${data.aws_region.current.region}.glue"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-
-  subnet_ids         = [var.subnet_id]
-  security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
-
-  tags = { Name = "${var.environment}-glue-interface-endpoint" }
-}
-
-resource "aws_vpc_endpoint" "athena_interface" {
-  vpc_id              = var.vpc_id
-  service_name        = "com.amazonaws.${data.aws_region.current.region}.athena"
-  vpc_endpoint_type   = "Interface"
-  private_dns_enabled = true
-
-  subnet_ids         = [var.subnet_id]
-  security_group_ids = [aws_security_group.vpc_endpoints_sg.id]
-
-  tags = { Name = "${var.environment}-athena-interface-endpoint" }
+# 4. Garante que a tabela de rotas da sub-rede do Glue esteja associada ao S3 Gateway Endpoint.
+# Isso resolve o erro "Could not find S3 endpoint" que o Glue Job pode encontrar.
+resource "aws_vpc_endpoint_route_table_association" "s3_route_association" {
+  vpc_endpoint_id = data.aws_vpc_endpoint.s3_gateway_existing.id
+  route_table_id  = data.aws_route_table.glue_job_subnet_route_table.id
 }
 
 ###########################
