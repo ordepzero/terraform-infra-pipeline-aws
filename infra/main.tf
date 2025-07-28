@@ -318,7 +318,9 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
-          "logs:DescribeLogStreams"
+          "logs:DescribeLogStreams",
+          "logs:DescribeLogGroups",
+          "logs:AssociateKmsKey"
         ]
         Resource = "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws-glue/jobs:*"
       },
@@ -464,7 +466,9 @@ resource "aws_iam_role_policy" "lambda_policy" {
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
           "logs:PutLogEvents",
-          "logs:DescribeLogStreams"
+          "logs:DescribeLogStreams",
+          "logs:DescribeLogGroups",
+          "logs:AssociateKmsKey"
         ]
         Resource = "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/*:*"
       },
