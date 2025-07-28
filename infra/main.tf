@@ -371,10 +371,7 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
       {
         "Effect": "Allow",
         "Action": "cloudwatch:PutMetricData",
-        "Resource": "*",
-        "Condition": {
-          "StringEquals": { "cloudwatch:namespace": "AWS/Glue" }
-        }
+        "Resource": "*"
       }
       ]
   })
