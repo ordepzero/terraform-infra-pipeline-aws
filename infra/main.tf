@@ -108,7 +108,7 @@ resource "aws_security_group_rule" "glue_egress_all" {
 # Certifique-se de que o nome "${var.environment}-vpc-endpoints-sg" corresponde ao nome do SG
 # que está atualmente associado aos seus VPC Endpoints (vpce-08e4b967bd3862dab, etc.).
 data "aws_security_group" "vpc_endpoints_sg_existing" {
-  id = var.vpc_endpoints_sg_id
+  id = var.glue_job_sg_id
 }
 
 # A regra de permissão agora é adicionada ao SG existente encontrado acima.
@@ -317,7 +317,8 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
         Action = [
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
-          "logs:PutLogEvents"
+          "logs:PutLogEvents",
+          "logs:DescribeLogStreams"
         ]
         Resource = "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws-glue/jobs:*"
       },
@@ -462,7 +463,8 @@ resource "aws_iam_role_policy" "lambda_policy" {
         Action = [
           "logs:CreateLogGroup",
           "logs:CreateLogStream",
-          "logs:PutLogEvents"
+          "logs:PutLogEvents",
+          "logs:DescribeLogStreams"
         ]
         Resource = "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/lambda/*:*"
       },
