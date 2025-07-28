@@ -145,6 +145,48 @@ resource "aws_vpc_endpoint" "s3_gateway" {
   tags              = { Name = "${var.environment}-s3-gateway-endpoint" }
 }
 
+# --- Criação dos VPC Interface Endpoints ---
+# Essenciais para que o Glue Job possa se comunicar com outros serviços AWS
+# (Logs, Glue API, Athena) de dentro da VPC, sem precisar de acesso à internet.
+
+resource "aws_vpc_endpoint" "logs_interface" {
+  vpc_id              = var.vpc_id
+  service_name        = "com.amazonaws.${data.aws_region.current.region}.logs"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+
+  subnet_ids         = [var.subnet_id]
+  security_group_ids = [data.aws_security_group.vpc_endpoints_sg_existing.id]
+
+  tags = {
+    Name = "${var.environment}-logs-interface-endpoint"
+  }
+}
+
+resource "aws_vpc_endpoint" "glue_interface" {
+  vpc_id              = var.vpc_id
+  service_name        = "com.amazonaws.${data.aws_region.current.region}.glue"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+
+  subnet_ids         = [var.subnet_id]
+  security_group_ids = [data.aws_security_group.vpc_endpoints_sg_existing.id]
+
+  tags = { Name = "${var.environment}-glue-interface-endpoint" }
+}
+
+resource "aws_vpc_endpoint" "athena_interface" {
+  vpc_id              = var.vpc_id
+  service_name        = "com.amazonaws.${data.aws_region.current.region}.athena"
+  vpc_endpoint_type   = "Interface"
+  private_dns_enabled = true
+
+  subnet_ids         = [var.subnet_id]
+  security_group_ids = [data.aws_security_group.vpc_endpoints_sg_existing.id]
+
+  tags = { Name = "${var.environment}-athena-interface-endpoint" }
+}
+
 ###########################
 ###   GLUE CONNECTION   ###
 ###########################
