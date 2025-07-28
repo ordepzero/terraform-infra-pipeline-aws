@@ -322,7 +322,7 @@ resource "aws_iam_role_policy" "glue_job_s3_access" {
           "logs:DescribeLogGroups",
           "logs:AssociateKmsKey"
         ]
-        Resource = "arn:aws:logs:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws-glue/jobs:*"
+        Resource = "*"
       },
       {
         Effect = "Allow"
