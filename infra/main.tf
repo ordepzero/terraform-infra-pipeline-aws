@@ -56,68 +56,26 @@ resource "aws_s3_object" "glue_python_libraries" {
 ####   SECURITY GROUPS   ###
 ############################
 
-resource "aws_security_group" "glue_job_security_group" {
-  name        = "${var.environment}-glue-job-sg"
-  description = "Security group for AWS Glue jobs in VPC"
-  vpc_id      = var.vpc_id # Você precisará definir esta variável (o ID da sua VPC)
-
-  tags = {
-    Name = "${var.environment}-glue-job-sg"
-  }
-}
-
-# Regra de Security Group para permitir todo o tráfego de entrada do próprio SG
-# Isso é necessário para a comunicação interna dos componentes do Glue Job na VPC.
-resource "aws_security_group_rule" "glue_self_ingress_all" {
-  type              = "ingress"
-  from_port         = 0
-  to_port           = 65535
-  protocol          = -1 # -1 significa todos os protocolos
-  security_group_id = aws_security_group.glue_job_security_group.id
-  self              = true # Permite tráfego de e para o próprio Security Group
-  description       = "Required for AWS Glue internal communication within VPC"
-}
-
-
-# Regra de SAÍDA para o SG do Glue Job: Permite DNS. Necessário para resolver nomes de endpoints.
-resource "aws_security_group_rule" "glue_job_egress_dns" {
-  type              = "egress"
-  from_port         = 53
-  to_port           = 53
-  protocol          = "udp"
-  cidr_blocks       = [data.aws_vpc.default.cidr_block] # Ou o CIDR da sua VPC
-  security_group_id = aws_security_group.glue_job_security_group.id
-  description       = "Allow DNS resolution within the VPC"
-}
-
-# Regra de Security Group para permitir todo o tráfego de saída
-# Isso é comum para Glue Jobs, permitindo acesso a S3, CloudWatch, etc.
-resource "aws_security_group_rule" "glue_egress_all" {
-  type              = "egress"
-  from_port         = 0
-  to_port           = 0
-  protocol          = "-1" # -1 significa todos os protocolos
-  cidr_blocks       = ["0.0.0.0/0"]
-  security_group_id = aws_security_group.glue_job_security_group.id
-  description       = "Allow all outbound traffic"
-}
-
-
 # --- Configuração de Rede para Recursos Existentes ---
 
-# 1. Referencia o Security Group existente dos endpoints usando o ID fornecido.
+# 1. Referencia os Security Groups existentes usando os IDs fornecidos.
 data "aws_security_group" "vpc_endpoints_sg_existing" {
   id = var.vpc_endpoints_sg_id
 }
 
-# 2. Adiciona a regra de permissão necessária ao SG existente.
+data "aws_security_group" "glue_job_sg_existing" {
+  id = var.glue_job_sg_id
+}
+
+# 2. Adiciona a regra de permissão de entrada (Ingress) necessária ao SG dos endpoints.
+#    Isso permite que o Glue Job se comunique com os endpoints.
 resource "aws_security_group_rule" "endpoints_ingress_from_glue_job" {
   type                     = "ingress"
   from_port                = 443
   to_port                  = 443
   protocol                 = "tcp"
   security_group_id        = data.aws_security_group.vpc_endpoints_sg_existing.id
-  source_security_group_id = aws_security_group.glue_job_security_group.id
+  source_security_group_id = data.aws_security_group.glue_job_sg_existing.id
   description              = "Allow HTTPS from Glue Job"
 }
 
@@ -136,7 +94,10 @@ data "aws_route_table" "glue_job_subnet_route_table" {
 # 3. Referencia o S3 Gateway Endpoint existente.
 # Usamos a fonte de dados no plural para filtrar de forma confiável pelo tipo de endpoint.
 data "aws_vpc_endpoints" "s3_gateway_existing" {
-  vpc_id            = var.vpc_id
+  filter {
+    name   = "vpc-id"
+    values = [var.vpc_id]
+  }
   filter {
     name   = "service-name"
     values = ["com.amazonaws.${data.aws_region.current.region}.s3"]
@@ -167,7 +128,7 @@ resource "aws_glue_connection" "glue_connection" {
   physical_connection_requirements {
     availability_zone = data.aws_subnet.glue_job_subnet.availability_zone
     # Agora referenciamos o ID do Security Group que acabamos de criar
-    security_group_id_list = [aws_security_group.glue_job_security_group.id] 
+    security_group_id_list = [data.aws_security_group.glue_job_sg_existing.id]
     subnet_id = var.subnet_id
   }
 }
