@@ -69,16 +69,14 @@ variable "subnet_id" {
   type        = string
 }
 
-variable "create_glue_endpoint" {
-  type    = bool
+variable "vpc_endpoints_sg_id" {
+  description = "The ID of the existing security group associated with the VPC endpoints."
+  type        = string
 }
 
-variable "create_logs_endpoint" {
-  type    = bool
-}
-
-variable "create_athena_endpoint" {
-  type    = bool
+variable "glue_job_sg_id" {
+  description = "The ID of the existing security group associated with the Glue Job."
+  type        = string
 }
 
 variable "lambda_state" {
