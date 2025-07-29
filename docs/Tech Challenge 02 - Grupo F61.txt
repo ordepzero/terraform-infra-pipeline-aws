@@ -20,4 +20,4 @@ Link com Diagrama de Arquitetura do Sistema:
 https://github.com/ordepzero/terraform-infra-pipeline-aws/blob/main/docs/imagens/Tech_Challenge_01_-_Arquitetura_de_Solucao.png
 
 Link do Vídeo no Youtube:
-(atualizar)
+https://youtu.be/vFbcl6M1Qho
