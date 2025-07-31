@@ -141,7 +141,7 @@ Em face ao desafio proposto, segue detalhes da solução:
 ## Vídeo de Apresentação no Youtube
 Para melhor compreensão da entrega, foi produzido um vídeo de apresentação que foi publicado no Youtube:
 
-[Link para a Vídeo](inserir link)
+https://youtu.be/54HSIaGtnTg
 
 
 ## ✒️ Autores
